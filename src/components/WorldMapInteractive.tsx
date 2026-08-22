@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { getFingerprint } from "@/lib/fingerprint";
+import TurnstileWidget, { type TurnstileWidgetHandle } from "./TurnstileWidget";
+
 export interface CountryPath {
   id: string;
   name: string;
@@ -39,6 +42,12 @@ interface HoverState {
   id: string;
   x: number;
   y: number;
+}
+
+interface VoteState {
+  count: number;
+  votedToday: boolean;
+  votedCountryIsoCode: string | null;
 }
 
 const MIN_SCALE = 1;
@@ -80,10 +89,16 @@ export default function WorldMapInteractive({
   const svgRef = useRef<SVGSVGElement>(null);
   const pointers = useRef<Map<number, Point>>(new Map());
   const dragRef = useRef<DragState | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   const [view, setView] = useState<ViewState>({ scale: 1, x: 0, y: 0 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hover, setHover] = useState<HoverState | null>(null);
+  const [voteState, setVoteState] = useState<VoteState | null>(null);
+  const [voteLoading, setVoteLoading] = useState(false);
+  const [voteSubmitting, setVoteSubmitting] = useState(false);
+  const [voteError, setVoteError] = useState<string | null>(null);
 
   const countryById = useMemo(() => new Map(countries.map((country) => [country.id, country])), [countries]);
 
@@ -272,12 +287,89 @@ export default function WorldMapInteractive({
       ? `${selectedCountry.alpha2} / ${selectedCountry.alpha3}`
       : "No ISO code (disputed territory)"
     : null;
+  const voteIsoCode = selectedCountry?.alpha2;
+
+  // Fetch the vote count + "did I already vote today" status whenever the
+  // selected country changes. Countries without an ISO code (disputed
+  // territories) aren't in the `countries` table, so there's nothing to vote
+  // on — skip the request entirely for those.
+  useEffect(() => {
+    if (!voteIsoCode) {
+      // Nothing to fetch — the JSX below only reads vote state when
+      // voteIsoCode is set, so any stale state here is simply never shown.
+      return;
+    }
+    let cancelled = false;
+    // Setting loading/error state before kicking off the fetch is the
+    // standard data-fetching-effect pattern; the lint rule's "no setState in
+    // effect body" heuristic doesn't recognize it as synchronizing with an
+    // external system (the network request right below), so it's silenced
+    // here rather than restructured into something less readable.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setVoteLoading(true);
+    setVoteError(null);
+    getFingerprint()
+      .then((fingerprint) =>
+        fetch(
+          `/api/votes?country=${encodeURIComponent(voteIsoCode)}&fingerprint=${encodeURIComponent(fingerprint)}`,
+        ),
+      )
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.error) throw new Error(data.error);
+        setVoteState(data);
+      })
+      .catch(() => {
+        if (!cancelled) setVoteError("Couldn't load vote data.");
+      })
+      .finally(() => {
+        if (!cancelled) setVoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [voteIsoCode]);
+
+  const handleVote = useCallback(async () => {
+    if (!voteIsoCode) return;
+    setVoteSubmitting(true);
+    setVoteError(null);
+    try {
+      const [fingerprint, turnstileToken] = await Promise.all([
+        getFingerprint(),
+        turnstileSiteKey && turnstileRef.current ? turnstileRef.current.getToken() : Promise.resolve(undefined),
+      ]);
+      const res = await fetch("/api/votes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ countryIsoCode: voteIsoCode, fingerprint, turnstileToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Vote failed.");
+      setVoteState(data);
+    } catch (err) {
+      setVoteError(err instanceof Error ? err.message : "Vote failed.");
+    } finally {
+      setVoteSubmitting(false);
+    }
+  }, [voteIsoCode, turnstileSiteKey]);
+
+  const votedForSelected = Boolean(voteState?.votedToday && voteState.votedCountryIsoCode === voteIsoCode);
+  const voteButtonLabel = voteLoading
+    ? "Loading…"
+    : votedForSelected
+      ? "You already voted today"
+      : voteState?.votedToday
+        ? "Move your vote here"
+        : "Vote";
 
   const buttonClass =
     "flex h-8 w-8 items-center justify-center rounded-md border border-zinc-300 bg-white text-lg leading-none text-zinc-700 shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800";
 
   return (
     <div className="flex w-full flex-col gap-2">
+      {turnstileSiteKey && <TurnstileWidget ref={turnstileRef} siteKey={turnstileSiteKey} />}
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         Hover a country to see its name. Click a country to see its details.
       </p>
@@ -361,6 +453,28 @@ export default function WorldMapInteractive({
               </button>
             </div>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">ISO 3166-1: {isoLabel}</p>
+            {voteIsoCode ? (
+              <div className="mt-4 flex flex-col gap-2">
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  {voteLoading
+                    ? "Loading votes…"
+                    : `${voteState?.count ?? 0} vote${(voteState?.count ?? 0) === 1 ? "" : "s"}`}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleVote}
+                  disabled={voteLoading || voteSubmitting || votedForSelected}
+                  className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-700 dark:disabled:text-zinc-400"
+                >
+                  {voteButtonLabel}
+                </button>
+                {voteError && <p className="text-xs text-red-600 dark:text-red-400">{voteError}</p>}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-500">
+                Voting isn&apos;t available for this territory.
+              </p>
+            )}
           </aside>
         )}
       </div>
