@@ -4,7 +4,8 @@ import type { Topology, GeometryCollection } from "topojson-specification";
 import { whereNumeric } from "iso-3166-1";
 
 import countriesTopology from "@/data/countries-110m.json";
-import WorldMapInteractive, { type CountryPath } from "./WorldMapInteractive";
+import Dashboard from "./Dashboard";
+import { type CountryPath } from "./WorldMapInteractive";
 
 const WIDTH = 960;
 const HEIGHT = 500;
@@ -54,7 +55,5 @@ const countryPaths: CountryPath[] = countryFeatures.map((country, index) => {
 });
 
 export default function WorldMap() {
-  return (
-    <WorldMapInteractive countries={countryPaths} width={WIDTH} height={HEIGHT} />
-  );
+  return <Dashboard countries={countryPaths} width={WIDTH} height={HEIGHT} />;
 }

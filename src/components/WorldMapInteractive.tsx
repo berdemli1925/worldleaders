@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { getFingerprint } from "@/lib/fingerprint";
-import TurnstileWidget, { type TurnstileWidgetHandle } from "./TurnstileWidget";
+import { voteCountToColor } from "@/lib/vote-color-scale";
+import type { MyVoteStatus } from "@/lib/use-vote";
 
 export interface CountryPath {
   id: string;
@@ -17,6 +17,16 @@ interface WorldMapInteractiveProps {
   countries: CountryPath[];
   width: number;
   height: number;
+  /** Live vote counts keyed by ISO alpha-2 code, used to color the map. */
+  voteCounts: Map<string, number>;
+  /** Highest count across all countries — the top of the color scale. */
+  maxVotes: number;
+  /** Global "have I voted today, and for which country" — shared with the leaderboard. */
+  voteStatus: MyVoteStatus | null;
+  /** ISO code of the vote currently being submitted, if any. */
+  submittingIso: string | null;
+  voteError: string | null;
+  onVote: (isoCode: string) => void;
 }
 
 interface Point {
@@ -42,12 +52,6 @@ interface HoverState {
   id: string;
   x: number;
   y: number;
-}
-
-interface VoteState {
-  count: number;
-  votedToday: boolean;
-  votedCountryIsoCode: string | null;
 }
 
 const MIN_SCALE = 1;
@@ -85,20 +89,20 @@ export default function WorldMapInteractive({
   countries,
   width,
   height,
+  voteCounts,
+  maxVotes,
+  voteStatus,
+  submittingIso,
+  voteError,
+  onVote,
 }: WorldMapInteractiveProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const pointers = useRef<Map<number, Point>>(new Map());
   const dragRef = useRef<DragState | null>(null);
-  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   const [view, setView] = useState<ViewState>({ scale: 1, x: 0, y: 0 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hover, setHover] = useState<HoverState | null>(null);
-  const [voteState, setVoteState] = useState<VoteState | null>(null);
-  const [voteLoading, setVoteLoading] = useState(false);
-  const [voteSubmitting, setVoteSubmitting] = useState(false);
-  const [voteError, setVoteError] = useState<string | null>(null);
 
   const countryById = useMemo(() => new Map(countries.map((country) => [country.id, country])), [countries]);
 
@@ -289,96 +293,32 @@ export default function WorldMapInteractive({
     : null;
   const voteIsoCode = selectedCountry?.alpha2;
 
-  // Fetch the vote count + "did I already vote today" status whenever the
-  // selected country changes. Countries without an ISO code (disputed
-  // territories) aren't in the `countries` table, so there's nothing to vote
-  // on — skip the request entirely for those.
-  useEffect(() => {
-    if (!voteIsoCode) {
-      // Nothing to fetch — the JSX below only reads vote state when
-      // voteIsoCode is set, so any stale state here is simply never shown.
-      return;
-    }
-    let cancelled = false;
-    // Setting loading/error state before kicking off the fetch is the
-    // standard data-fetching-effect pattern; the lint rule's "no setState in
-    // effect body" heuristic doesn't recognize it as synchronizing with an
-    // external system (the network request right below), so it's silenced
-    // here rather than restructured into something less readable.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setVoteLoading(true);
-    setVoteError(null);
-    getFingerprint()
-      .then((fingerprint) =>
-        fetch(
-          `/api/votes?country=${encodeURIComponent(voteIsoCode)}&fingerprint=${encodeURIComponent(fingerprint)}`,
-        ),
-      )
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data?.error) throw new Error(data.error);
-        setVoteState(data);
-      })
-      .catch(() => {
-        if (!cancelled) setVoteError("Couldn't load vote data.");
-      })
-      .finally(() => {
-        if (!cancelled) setVoteLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [voteIsoCode]);
-
-  const handleVote = useCallback(async () => {
-    if (!voteIsoCode) return;
-    setVoteSubmitting(true);
-    setVoteError(null);
-    try {
-      const [fingerprint, turnstileToken] = await Promise.all([
-        getFingerprint(),
-        turnstileSiteKey && turnstileRef.current ? turnstileRef.current.getToken() : Promise.resolve(undefined),
-      ]);
-      const res = await fetch("/api/votes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ countryIsoCode: voteIsoCode, fingerprint, turnstileToken }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Vote failed.");
-      setVoteState(data);
-    } catch (err) {
-      setVoteError(err instanceof Error ? err.message : "Vote failed.");
-    } finally {
-      setVoteSubmitting(false);
-    }
-  }, [voteIsoCode, turnstileSiteKey]);
-
-  const votedForSelected = Boolean(voteState?.votedToday && voteState.votedCountryIsoCode === voteIsoCode);
-  const voteButtonLabel = voteLoading
-    ? "Loading…"
+  const votedForSelected = Boolean(voteIsoCode && voteStatus?.votedCountryIsoCode === voteIsoCode);
+  const isSubmitting = Boolean(voteIsoCode && submittingIso === voteIsoCode);
+  const voteButtonLabel = isSubmitting
+    ? "Voting…"
     : votedForSelected
       ? "You already voted today"
-      : voteState?.votedToday
+      : voteStatus?.votedToday
         ? "Move your vote here"
         : "Vote";
 
+  const handleVoteClick = useCallback(() => {
+    if (voteIsoCode) onVote(voteIsoCode);
+  }, [voteIsoCode, onVote]);
+
   const buttonClass =
-    "flex h-8 w-8 items-center justify-center rounded-md border border-zinc-300 bg-white text-lg leading-none text-zinc-700 shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800";
+    "flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-lg leading-none text-foreground shadow-sm hover:bg-surface-hover";
 
   return (
     <div className="flex w-full flex-col gap-2">
-      {turnstileSiteKey && <TurnstileWidget ref={turnstileRef} siteKey={turnstileSiteKey} />}
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Hover a country to see its name. Click a country to see its details.
-      </p>
+      <p className="text-sm text-muted">Hover a country to see its name. Click a country to see its details.</p>
       <p className="sr-only">
         Scroll or pinch to zoom, drag to pan. Each country is focusable and can
         be selected with Enter or Space.
       </p>
       <div className="flex w-full flex-col gap-4 sm:flex-row">
-        <div className="relative min-w-0 flex-1 overflow-hidden rounded-lg">
+        <div className="relative min-w-0 flex-1 overflow-hidden rounded-lg bg-black/20">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${width} ${height}`}
@@ -392,6 +332,7 @@ export default function WorldMapInteractive({
             <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
               {countries.map((country) => {
                 const isSelected = country.id === selectedId;
+                const voteCount = country.alpha2 ? (voteCounts.get(country.alpha2) ?? 0) : 0;
                 return (
                   <path
                     key={country.id}
@@ -400,14 +341,15 @@ export default function WorldMapInteractive({
                     tabIndex={0}
                     role="button"
                     aria-pressed={isSelected}
-                    aria-label={country.name}
+                    aria-label={`${country.name}, ${voteCount} vote${voteCount === 1 ? "" : "s"}`}
                     onKeyDown={(event) => handleKeyDown(event, country.id)}
                     strokeWidth={isSelected ? 1.5 : 0.5}
                     vectorEffect="non-scaling-stroke"
+                    style={{ fill: voteCountToColor(voteCount, maxVotes) }}
                     className={
                       isSelected
-                        ? "cursor-pointer fill-slate-200 stroke-blue-600 hover:fill-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500 dark:fill-slate-700 dark:stroke-blue-400 dark:hover:fill-slate-600"
-                        : "cursor-pointer fill-slate-200 stroke-slate-500 hover:fill-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500 dark:fill-slate-700 dark:stroke-slate-400 dark:hover:fill-slate-600"
+                        ? "cursor-pointer stroke-accent transition-opacity hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                        : "cursor-pointer stroke-black/40 transition-opacity hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                     }
                   />
                 );
@@ -432,7 +374,7 @@ export default function WorldMapInteractive({
           </div>
           {hoveredCountry && (
             <div
-              className="pointer-events-none fixed z-50 -translate-y-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-800 shadow-md dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              className="pointer-events-none fixed z-50 -translate-y-full rounded-md border border-border bg-surface px-2 py-1 text-xs font-medium text-foreground shadow-md"
               style={{ left: (hover?.x ?? 0) + 12, top: (hover?.y ?? 0) - 10 }}
             >
               {hoveredCountry.name}
@@ -440,40 +382,39 @@ export default function WorldMapInteractive({
           )}
         </div>
         {selectedCountry && (
-          <aside className="w-full shrink-0 border-t border-zinc-200 pt-4 dark:border-zinc-800 sm:w-64 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+          <aside className="w-full shrink-0 border-t border-border pt-4 sm:w-64 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
             <div className="flex items-start justify-between gap-2">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{selectedCountry.name}</h2>
+              <h2 className="text-lg font-semibold text-foreground">{selectedCountry.name}</h2>
               <button
                 type="button"
                 aria-label="Close panel"
                 onClick={() => setSelectedId(null)}
-                className="text-lg leading-none text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                className="text-lg leading-none text-muted hover:text-foreground"
               >
                 ×
               </button>
             </div>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">ISO 3166-1: {isoLabel}</p>
+            <p className="mt-2 text-sm text-muted">ISO 3166-1: {isoLabel}</p>
             {voteIsoCode ? (
               <div className="mt-4 flex flex-col gap-2">
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {voteLoading
-                    ? "Loading votes…"
-                    : `${voteState?.count ?? 0} vote${(voteState?.count ?? 0) === 1 ? "" : "s"}`}
+                <p className="text-sm text-muted">
+                  {(() => {
+                    const liveCount = voteCounts.get(voteIsoCode) ?? 0;
+                    return `${liveCount} vote${liveCount === 1 ? "" : "s"}`;
+                  })()}
                 </p>
                 <button
                   type="button"
-                  onClick={handleVote}
-                  disabled={voteLoading || voteSubmitting || votedForSelected}
-                  className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-700 dark:disabled:text-zinc-400"
+                  onClick={handleVoteClick}
+                  disabled={isSubmitting || votedForSelected}
+                  className="rounded-full bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
                 >
                   {voteButtonLabel}
                 </button>
-                {voteError && <p className="text-xs text-red-600 dark:text-red-400">{voteError}</p>}
+                {voteError && <p className="text-xs text-danger">{voteError}</p>}
               </div>
             ) : (
-              <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-500">
-                Voting isn&apos;t available for this territory.
-              </p>
+              <p className="mt-4 text-sm text-muted-2">Voting isn&apos;t available for this territory.</p>
             )}
           </aside>
         )}

@@ -69,19 +69,20 @@ async function verifyTurnstile(
 }
 
 export async function GET(request: NextRequest) {
+  // `country` is optional here: callers that only need the global "have I
+  // voted today, and for what" status (e.g. to drive per-row vote buttons in
+  // a leaderboard, without one count request per row) can omit it and get
+  // `count: null` back.
   const countryIsoCode = request.nextUrl.searchParams.get("country");
   const fingerprint = request.nextUrl.searchParams.get("fingerprint");
-  if (!countryIsoCode || !fingerprint) {
-    return NextResponse.json(
-      { error: "Missing 'country' or 'fingerprint' query parameter." },
-      { status: 400 },
-    );
+  if (!fingerprint) {
+    return NextResponse.json({ error: "Missing 'fingerprint' query parameter." }, { status: 400 });
   }
 
   try {
     const ip = getClientIp(request);
     const [count, todaysVote] = await Promise.all([
-      countVotesFor(countryIsoCode),
+      countryIsoCode ? countVotesFor(countryIsoCode) : Promise.resolve(null),
       findTodaysVote(ip, fingerprint),
     ]);
 

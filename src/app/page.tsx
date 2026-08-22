@@ -2,17 +2,15 @@ import WorldMap from "@/components/WorldMap";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col items-center bg-zinc-50 px-4 py-12 font-sans dark:bg-black">
-      <main className="flex w-full max-w-5xl flex-col items-center gap-6">
-        <h1 className="text-center text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
-          World Leaders
-        </h1>
-        <p className="max-w-xl text-center text-zinc-600 dark:text-zinc-400">
-          An interactive map where the world&apos;s countries compete by vote.
-        </p>
-        <div className="w-full rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-          <WorldMap />
+    <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-8 sm:py-12">
+      <main className="flex w-full max-w-4xl flex-col items-center gap-6">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">World leaders</h1>
+          <p className="max-w-xl text-sm text-muted">
+            Vote for your country, watch the ranking shift, and see who&apos;s currently sitting on the throne.
+          </p>
         </div>
+        <WorldMap />
       </main>
     </div>
   );
