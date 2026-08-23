@@ -43,6 +43,9 @@ const countryPaths: CountryPath[] = countryFeatures.map((country, index) => {
   // guarantees for lookup libraries, so pad it to the standard 3 digits.
   const isoInfo = hasIsoId ? whereNumeric(String(rawId).padStart(3, "0")) : undefined;
 
+  const bounds = pathGenerator.bounds(country);
+  const centroid = pathGenerator.centroid(country);
+
   return {
     id,
     name:
@@ -51,6 +54,13 @@ const countryPaths: CountryPath[] = countryFeatures.map((country, index) => {
     alpha2: isoInfo?.alpha2,
     alpha3: isoInfo?.alpha3,
     d: pathGenerator(country) ?? "",
+    // Same 960x500 coordinate space as `d` — used by WorldMapInteractive to
+    // decide, per country, whether it's on-screen and large enough at the
+    // current zoom to show a leader's clipped post image vs. a small
+    // avatar marker. Computed once here (server-side, module load) rather
+    // than measured at runtime via getBBox().
+    bounds: [bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]],
+    centroid: [centroid[0], centroid[1]],
   };
 });
 

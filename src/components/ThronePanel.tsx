@@ -1,0 +1,117 @@
+"use client";
+
+import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
+import CountdownTimer from "./CountdownTimer";
+import ReportButton from "./ReportButton";
+
+interface ThronePanelProps {
+  isoCode: string;
+  throne: ThroneEntry | undefined;
+  /** Full claim history across all countries — filtered to this one internally. */
+  claimHistory: ThroneClaimHistoryEntry[];
+  now: number | null;
+  onOpenClaim: () => void;
+}
+
+function formatMoney(amount: number): string {
+  return `$${amount.toLocaleString("en-US")}`;
+}
+
+// The "who leads this country, and how to take it over" block — shared by
+// the leaderboard's expandable cards (Leaderboard.tsx) and the map's
+// country side panel (WorldMapInteractive.tsx) so both show the exact same
+// leader info/claim button instead of two copies drifting apart.
+export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpenClaim }: ThronePanelProps) {
+  const hasLeader = !isVacant(throne);
+  const pastClaims = claimHistory.filter((claim) => claim.isoCode === isoCode && claim.id !== throne?.currentClaimId);
+  const visibleHistory = pastClaims.slice(0, 5);
+  const extraHistory = pastClaims.length - visibleHistory.length;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {hasLeader && throne ? (
+        <>
+          {throne.postImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={throne.postImageUrl}
+              alt=""
+              className="w-full rounded-xl object-cover"
+              style={{ maxHeight: 320 }}
+            />
+          )}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                {throne.logoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={throne.logoUrl} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                )}
+                <a
+                  href={`https://x.com/${throne.handle}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-foreground hover:text-accent"
+                >
+                  {throne.brandTitle || `@${throne.handle}`}
+                </a>
+                <span className="text-muted-2">paid</span>
+                <span className="font-mono font-medium text-accent">{formatMoney(throne.currentValue ?? 0)}</span>
+                <ReportButton throneClaimId={throne.currentClaimId ?? 0} compact />
+              </div>
+              {throne.postText && (
+                <p className="border-l-2 border-border pl-2 text-xs italic text-muted">&ldquo;{throne.postText}&rdquo;</p>
+              )}
+              {throne.description && <p className="text-xs text-muted">{throne.description}</p>}
+              {throne.linkUrl && (
+                <a
+                  href={throne.linkUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="truncate text-xs text-muted-2 hover:text-accent"
+                >
+                  {throne.linkUrl}
+                </a>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-[11px] text-muted-2">Reign ends in</p>
+                <CountdownTimer target={throne.cycleEnd ?? 0} now={now} className="font-mono text-sm text-foreground" />
+              </div>
+              <button
+                type="button"
+                onClick={onOpenClaim}
+                className="rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
+              >
+                Take the throne ({formatMoney(requiredMinimum(throne))})
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-2">No leader yet — base price {formatMoney(requiredMinimum(throne))}</p>
+          <button
+            type="button"
+            onClick={onOpenClaim}
+            className="rounded-full bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25"
+          >
+            Claim this country ({formatMoney(requiredMinimum(throne))})
+          </button>
+        </div>
+      )}
+
+      {visibleHistory.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {visibleHistory.map((past) => (
+            <span key={past.id} className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-muted">
+              @{past.handle} · {formatMoney(past.amountPaid)}
+            </span>
+          ))}
+          {extraHistory > 0 && <span className="px-1 text-[11px] text-muted-2">History (+{extraHistory})</span>}
+        </div>
+      )}
+    </div>
+  );
+}

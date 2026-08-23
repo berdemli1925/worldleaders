@@ -238,6 +238,10 @@ export default function Dashboard({ countries, width, height }: DashboardProps) 
           submittingIso={submittingIso}
           voteError={voteError}
           onVote={castVote}
+          thrones={thrones}
+          claimHistory={claimHistory}
+          now={now}
+          onThroneClaimed={handleThroneClaimed}
         />
       </div>
       <Leaderboard

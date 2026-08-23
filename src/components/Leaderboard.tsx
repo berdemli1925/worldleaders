@@ -3,12 +3,11 @@
 import { useMemo, useState } from "react";
 
 import { getCountryMeta } from "@/lib/country-meta";
-import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
+import { isVacant, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
-import CountdownTimer from "./CountdownTimer";
 import Flag from "./Flag";
-import ReportButton from "./ReportButton";
 import ThroneClaimModal from "./ThroneClaimModal";
+import ThronePanel from "./ThronePanel";
 
 export interface LeaderboardEntry {
   isoCode: string;
@@ -42,10 +41,6 @@ const PERIODS: [Period, string][] = [
   ["month", "This month"],
   ["allTime", "All time"],
 ];
-
-function formatMoney(amount: number): string {
-  return `$${amount.toLocaleString("en-US")}`;
-}
 
 export default function Leaderboard({
   entries,
@@ -85,19 +80,6 @@ export default function Leaderboard({
   }
 
   const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
-
-  // claimHistory arrives sorted newest-first (see Dashboard's fetch) —
-  // grouping preserves that order, so each country's list is already
-  // newest-first without re-sorting here.
-  const historyByIso = useMemo(() => {
-    const map = new Map<string, ThroneClaimHistoryEntry[]>();
-    for (const claim of claimHistory) {
-      const list = map.get(claim.isoCode);
-      if (list) list.push(claim);
-      else map.set(claim.isoCode, [claim]);
-    }
-    return map;
-  }, [claimHistory]);
 
   const activeEntries = period === "month" ? entries : allTimeEntries;
   // `totalVotes` from the parent is already this-month's sum (it also drives
@@ -220,12 +202,6 @@ export default function Leaderboard({
           const votedHere = voteStatus?.votedCountryIsoCode === entry.isoCode;
           const submitting = submittingIso === entry.isoCode;
           const voteLabel = submitting ? "Voting…" : votedHere ? "Voted" : "Vote";
-          const hasLeader = !isVacant(throne);
-          const pastClaims = (historyByIso.get(entry.isoCode) ?? []).filter(
-            (claim) => claim.id !== throne?.currentClaimId,
-          );
-          const visibleHistory = pastClaims.slice(0, 5);
-          const extraHistory = pastClaims.length - visibleHistory.length;
           const isExpanded = expandedIso === entry.isoCode;
 
           const toggleExpanded = () => setExpandedIso((current) => (current === entry.isoCode ? null : entry.isoCode));
@@ -291,119 +267,22 @@ export default function Leaderboard({
               >
                 <div className="overflow-hidden">
                   <div className="border-t border-border bg-black/15 p-4">
-                    {hasLeader && throne ? (
-                      <div className="flex flex-col gap-3">
-                        {throne.postImageUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={throne.postImageUrl}
-                            alt=""
-                            className="w-full rounded-xl object-cover"
-                            style={{ maxHeight: 320 }}
-                          />
-                        )}
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                              {throne.logoUrl && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={throne.logoUrl}
-                                  alt=""
-                                  className="h-5 w-5 shrink-0 rounded-full object-cover"
-                                />
-                              )}
-                              <a
-                                href={`https://x.com/${throne.handle}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(event) => event.stopPropagation()}
-                                className="font-medium text-foreground hover:text-accent"
-                              >
-                                {throne.brandTitle || `@${throne.handle}`}
-                              </a>
-                              <span className="text-muted-2">paid</span>
-                              <span className="font-mono font-medium text-accent">
-                                {formatMoney(throne.currentValue ?? 0)}
-                              </span>
-                              <span onClick={(event) => event.stopPropagation()}>
-                                <ReportButton throneClaimId={throne.currentClaimId ?? 0} compact />
-                              </span>
-                            </div>
-                            {throne.description && <p className="text-xs text-muted">{throne.description}</p>}
-                            {throne.linkUrl && (
-                              <a
-                                href={throne.linkUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(event) => event.stopPropagation()}
-                                className="truncate text-xs text-muted-2 hover:text-accent"
-                              >
-                                {throne.linkUrl}
-                              </a>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p className="text-[11px] text-muted-2">Reign ends in</p>
-                              <CountdownTimer
-                                target={throne.cycleEnd ?? 0}
-                                now={now}
-                                className="font-mono text-sm text-foreground"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setOpenClaimIso(openClaimIso === entry.isoCode ? null : entry.isoCode);
-                              }}
-                              className="rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
-                            >
-                              Take the throne ({formatMoney(requiredMinimum(throne))})
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-sm text-muted-2">No leader yet — base price {formatMoney(requiredMinimum(throne))}</p>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setOpenClaimIso(openClaimIso === entry.isoCode ? null : entry.isoCode);
-                          }}
-                          className="rounded-full bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25"
-                        >
-                          Claim this country ({formatMoney(requiredMinimum(throne))})
-                        </button>
-                      </div>
-                    )}
-
-                    {visibleHistory.length > 0 && (
-                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                        {visibleHistory.map((past) => (
-                          <span key={past.id} className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-muted">
-                            @{past.handle} · {formatMoney(past.amountPaid)}
-                          </span>
-                        ))}
-                        {extraHistory > 0 && (
-                          <span className="px-1 text-[11px] text-muted-2">History (+{extraHistory})</span>
-                        )}
-                      </div>
-                    )}
+                    <ThronePanel
+                      isoCode={entry.isoCode}
+                      throne={throne}
+                      claimHistory={claimHistory}
+                      now={now}
+                      onOpenClaim={() => setOpenClaimIso(openClaimIso === entry.isoCode ? null : entry.isoCode)}
+                    />
 
                     {openClaimIso === entry.isoCode && (
-                      <div onClick={(event) => event.stopPropagation()}>
-                        <ThroneClaimModal
-                          isoCode={entry.isoCode}
-                          countryName={entry.name}
-                          throne={throne}
-                          onClose={() => setOpenClaimIso(null)}
-                          onClaimed={onThroneClaimed}
-                        />
-                      </div>
+                      <ThroneClaimModal
+                        isoCode={entry.isoCode}
+                        countryName={entry.name}
+                        throne={throne}
+                        onClose={() => setOpenClaimIso(null)}
+                        onClaimed={onThroneClaimed}
+                      />
                     )}
                   </div>
                 </div>

@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { twitterImageVariant } from "@/lib/twitter-image";
 import { voteCountToColor } from "@/lib/vote-color-scale";
+import type { ThroneClaimHistoryEntry, ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
+import ThroneClaimModal from "./ThroneClaimModal";
+import ThronePanel from "./ThronePanel";
 
 export interface CountryPath {
   id: string;
@@ -11,6 +15,9 @@ export interface CountryPath {
   d: string;
   alpha2?: string;
   alpha3?: string;
+  /** [x0, y0, x1, y1] in the same coordinate space as `d` — see WorldMap.tsx. */
+  bounds: [number, number, number, number];
+  centroid: [number, number];
 }
 
 interface WorldMapInteractiveProps {
@@ -27,6 +34,12 @@ interface WorldMapInteractiveProps {
   submittingIso: string | null;
   voteError: string | null;
   onVote: (isoCode: string) => void;
+  /** Live throne state per country, and full claim history — same data the leaderboard uses. */
+  thrones: ThroneEntry[];
+  claimHistory: ThroneClaimHistoryEntry[];
+  /** Shared "now" clock, for the reign countdown — same one the top bar/leaderboard use. */
+  now: number | null;
+  onThroneClaimed: () => void;
 }
 
 interface Point {
@@ -61,6 +74,15 @@ const BUTTON_ZOOM_FACTOR = 1.4;
 // Below this much cumulative pointer movement (in CSS pixels), a press+release
 // is treated as a click/tap on a country rather than a pan gesture.
 const CLICK_THRESHOLD = 6;
+// A leadered country's on-screen bounding box must be at least this many
+// (viewBox-unit, roughly-pixel) wide *and* tall for its post image to
+// replace the small avatar marker — small islands etc. never cross this
+// even fully zoomed in, so they always keep the avatar.
+const IMAGE_MIN_SCREEN_PX = 32;
+// Avatar marker radius, compensated by view.scale below so it stays a
+// constant on-screen size regardless of zoom (same idea as the existing
+// vectorEffect="non-scaling-stroke" on country borders).
+const AVATAR_RADIUS_PX = 9;
 
 function dist(a: Point, b: Point) {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -95,6 +117,10 @@ export default function WorldMapInteractive({
   submittingIso,
   voteError,
   onVote,
+  thrones,
+  claimHistory,
+  now,
+  onThroneClaimed,
 }: WorldMapInteractiveProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const pointers = useRef<Map<number, Point>>(new Map());
@@ -103,8 +129,45 @@ export default function WorldMapInteractive({
   const [view, setView] = useState<ViewState>({ scale: 1, x: 0, y: 0 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hover, setHover] = useState<HoverState | null>(null);
+  const [claimModalOpen, setClaimModalOpen] = useState(false);
 
   const countryById = useMemo(() => new Map(countries.map((country) => [country.id, country])), [countries]);
+  const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
+
+  // Which leadered countries get the full clipped post image vs. the small
+  // avatar marker, at the current pan/zoom — and which get neither because
+  // they're currently panned off-screen. An <image>/<circle clip> node is
+  // only ever created for a country that lands in one of the two lists
+  // below, so this doubles as the lazy-load mechanism: the browser never
+  // fetches a leader's image/avatar until it actually needs to be shown.
+  // Kill-switch awareness needs no extra check here — thrones_with_leader
+  // already nulls every leader field site-wide when hidden, so throneByIso
+  // simply has nothing to show for any country in that case.
+  const leaderLayers = useMemo(() => {
+    const images: { country: CountryPath; imageUrl: string }[] = [];
+    const avatars: { country: CountryPath; avatarUrl: string }[] = [];
+
+    for (const country of countries) {
+      const throne = country.alpha2 ? throneByIso.get(country.alpha2) : undefined;
+      if (!throne || throne.currentValue === null) continue;
+
+      const [x0, y0, x1, y1] = country.bounds;
+      const screenX0 = x0 * view.scale + view.x;
+      const screenY0 = y0 * view.scale + view.y;
+      const screenX1 = x1 * view.scale + view.x;
+      const screenY1 = y1 * view.scale + view.y;
+      const onScreen = screenX1 >= 0 && screenX0 <= width && screenY1 >= 0 && screenY0 <= height;
+      if (!onScreen) continue;
+
+      if (throne.postImageUrl && screenX1 - screenX0 >= IMAGE_MIN_SCREEN_PX && screenY1 - screenY0 >= IMAGE_MIN_SCREEN_PX) {
+        images.push({ country, imageUrl: twitterImageVariant(throne.postImageUrl, "240x240") });
+      } else if (throne.postAuthorAvatarUrl) {
+        avatars.push({ country, avatarUrl: throne.postAuthorAvatarUrl });
+      }
+    }
+
+    return { images, avatars };
+  }, [countries, throneByIso, view, width, height]);
 
   const zoomAt = useCallback(
     (clientX: number, clientY: number, factor: number) => {
@@ -348,12 +411,90 @@ export default function WorldMapInteractive({
                     style={{ fill: voteCountToColor(voteCount, maxVotes) }}
                     className={
                       isSelected
-                        ? "cursor-pointer stroke-accent transition-opacity hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                        : "cursor-pointer stroke-black/40 transition-opacity hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                        ? "cursor-pointer stroke-accent outline-none transition-opacity hover:opacity-75"
+                        : "cursor-pointer stroke-black/40 outline-none transition-opacity hover:opacity-75"
                     }
                   />
                 );
               })}
+
+              {/* Leader content layer — painted on top of the base fill/
+                  stroke paths above, but pointer-events:none throughout so
+                  every existing click/hover/keyboard interaction still
+                  targets the base <path> underneath, completely unchanged. */}
+              {(leaderLayers.images.length > 0 || leaderLayers.avatars.length > 0) && (
+                <>
+                  <defs>
+                    {leaderLayers.images.map(({ country }) => (
+                      <clipPath key={`clip-img-${country.id}`} id={`clip-img-${country.id}`}>
+                        <path d={country.d} />
+                      </clipPath>
+                    ))}
+                    {leaderLayers.avatars.map(({ country }) => (
+                      <clipPath key={`clip-avatar-${country.id}`} id={`clip-avatar-${country.id}`}>
+                        <circle cx={country.centroid[0]} cy={country.centroid[1]} r={AVATAR_RADIUS_PX / view.scale} />
+                      </clipPath>
+                    ))}
+                  </defs>
+
+                  {leaderLayers.images.map(({ country, imageUrl }) => {
+                    const [x0, y0, x1, y1] = country.bounds;
+                    return (
+                      <g key={country.id} pointerEvents="none" clipPath={`url(#clip-img-${country.id})`}>
+                        <image
+                          href={imageUrl}
+                          x={x0}
+                          y={y0}
+                          width={x1 - x0}
+                          height={y1 - y0}
+                          preserveAspectRatio="xMidYMid slice"
+                        />
+                        {/* Light darkening so the (redrawn, on-top) border and hover tooltip name stay readable. */}
+                        <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill="black" fillOpacity={0.35} />
+                      </g>
+                    );
+                  })}
+                  {/* Redraw each image country's border on top, crisp, unobscured by the photo. */}
+                  {leaderLayers.images.map(({ country }) => (
+                    <path
+                      key={`border-${country.id}`}
+                      d={country.d}
+                      fill="none"
+                      className="stroke-accent"
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  ))}
+
+                  {leaderLayers.avatars.map(({ country, avatarUrl }) => {
+                    const r = AVATAR_RADIUS_PX / view.scale;
+                    const [cx, cy] = country.centroid;
+                    return (
+                      <g key={country.id} pointerEvents="none">
+                        <image
+                          href={avatarUrl}
+                          x={cx - r}
+                          y={cy - r}
+                          width={r * 2}
+                          height={r * 2}
+                          clipPath={`url(#clip-avatar-${country.id})`}
+                          preserveAspectRatio="xMidYMid slice"
+                        />
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={r}
+                          fill="none"
+                          className="stroke-accent"
+                          strokeWidth={1.5}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      </g>
+                    );
+                  })}
+                </>
+              )}
             </g>
           </svg>
           <div className="absolute right-2 top-2 flex flex-col gap-1">
@@ -388,7 +529,10 @@ export default function WorldMapInteractive({
               <button
                 type="button"
                 aria-label="Close panel"
-                onClick={() => setSelectedId(null)}
+                onClick={() => {
+                  setSelectedId(null);
+                  setClaimModalOpen(false);
+                }}
                 className="text-lg leading-none text-muted hover:text-foreground"
               >
                 ×
@@ -412,6 +556,16 @@ export default function WorldMapInteractive({
                   {voteButtonLabel}
                 </button>
                 {voteError && <p className="text-xs text-danger">{voteError}</p>}
+
+                <div className="mt-2 border-t border-border pt-4">
+                  <ThronePanel
+                    isoCode={voteIsoCode}
+                    throne={throneByIso.get(voteIsoCode)}
+                    claimHistory={claimHistory}
+                    now={now}
+                    onOpenClaim={() => setClaimModalOpen(true)}
+                  />
+                </div>
               </div>
             ) : (
               <p className="mt-4 text-sm text-muted-2">Voting isn&apos;t available for this territory.</p>
@@ -419,6 +573,16 @@ export default function WorldMapInteractive({
           </aside>
         )}
       </div>
+
+      {claimModalOpen && selectedCountry && voteIsoCode && (
+        <ThroneClaimModal
+          isoCode={voteIsoCode}
+          countryName={selectedCountry.name}
+          throne={throneByIso.get(voteIsoCode)}
+          onClose={() => setClaimModalOpen(false)}
+          onClaimed={onThroneClaimed}
+        />
+      )}
     </div>
   );
 }
