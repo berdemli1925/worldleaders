@@ -55,6 +55,18 @@ async function main() {
     );
   `);
 
+  // Snapshot of whoever held the winning country's throne at the moment it
+  // was archived — throne cycles (1 week) and this vote-ranking reset (1
+  // month) are independent, unaligned systems, so this is deliberately a
+  // point-in-time snapshot, not a live link to the leader. Null if the
+  // country was vacant at archive time.
+  await client.query(`
+    alter table monthly_champions
+      add column if not exists leader_x_handle text,
+      add column if not exists leader_brand_title text,
+      add column if not exists leader_amount_paid numeric(10,2);
+  `);
+
   // Main ranking: same 4 output columns as before (iso_code, name,
   // continent, vote_count), but vote_count is now scoped to the current UTC
   // calendar month. This *is* the monthly reset — nothing is deleted, a new
@@ -96,7 +108,10 @@ async function main() {
       mc.rank,
       c.iso_code,
       c.name,
-      mc.vote_count
+      mc.vote_count,
+      mc.leader_x_handle,
+      mc.leader_brand_title,
+      mc.leader_amount_paid
     from monthly_champions mc
     join countries c on c.iso_code = mc.country_iso_code
     order by mc.month desc, mc.rank asc;
@@ -110,6 +125,12 @@ async function main() {
   // so it's idempotent and safe to re-run (e.g. for manual testing via
   // scripts/run-monthly-archive.mjs) without creating duplicates or ever
   // touching the `votes` table itself.
+  // NOTE: references `thrones`/`throne_claims` (created by
+  // scripts/setup-throne-system.mjs) for the leader snapshot below.
+  // plpgsql function bodies aren't validated against schema at creation
+  // time — only when actually called — so this is fine as long as
+  // setup-throne-system.mjs has been run before this function is ever
+  // invoked, regardless of which setup script ran first.
   await client.query(`
     create or replace function archive_and_reset_month(
       target_month date default date_trunc('month', (now() at time zone 'utc') - interval '1 month')::date
@@ -122,8 +143,18 @@ async function main() {
     begin
       delete from monthly_champions where month = target_month;
 
-      insert into monthly_champions (month, rank, country_iso_code, vote_count)
-      select target_month, row_number() over (order by vote_count desc, country_iso_code asc), country_iso_code, vote_count
+      insert into monthly_champions (
+        month, rank, country_iso_code, vote_count,
+        leader_x_handle, leader_brand_title, leader_amount_paid
+      )
+      select
+        target_month,
+        row_number() over (order by top3.vote_count desc, top3.country_iso_code asc),
+        top3.country_iso_code,
+        top3.vote_count,
+        tc.x_handle,
+        tc.brand_title,
+        t.current_value
       from (
         select country_iso_code, count(*) as vote_count
         from votes
@@ -131,7 +162,12 @@ async function main() {
         group by country_iso_code
         order by vote_count desc, country_iso_code asc
         limit 3
-      ) top3;
+      ) top3
+      -- Only an actually-active throne counts as "the leader at archive
+      -- time" — cycle_end > now() excludes a row that's expired but not
+      -- yet swept, same vacancy rule thrones_live uses.
+      left join thrones t on t.country_iso_code = top3.country_iso_code and t.cycle_end > now()
+      left join throne_claims tc on tc.id = t.current_claim_id;
     end;
     $$;
   `);

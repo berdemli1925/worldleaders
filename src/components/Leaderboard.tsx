@@ -66,6 +66,23 @@ export default function Leaderboard({
   const [leaderFilter, setLeaderFilter] = useState<LeaderFilter>("all");
   const [period, setPeriod] = useState<Period>("month");
   const [openClaimIso, setOpenClaimIso] = useState<string | null>(null);
+  // Accordion: at most one card's details are open at a time. Separate from
+  // openClaimIso above — that's "which country's claim modal overlay is
+  // showing," an unrelated concern (the modal floats above everything
+  // regardless of which card is expanded).
+  const [expandedIso, setExpandedIso] = useState<string | null>(null);
+
+  // A ticker click sets highlightedIso to scroll to + ring a card — also
+  // expand it, since leader details are now collapsed by default and
+  // landing on a closed card would defeat the point of jumping to it.
+  // Derived-during-render sync (React's documented alternative to an
+  // effect for "adjust state when a prop changes") rather than useEffect,
+  // which would set state after an extra commit instead of before paint.
+  const [syncedHighlight, setSyncedHighlight] = useState(highlightedIso);
+  if (highlightedIso !== syncedHighlight) {
+    setSyncedHighlight(highlightedIso);
+    if (highlightedIso) setExpandedIso(highlightedIso);
+  }
 
   const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
 
@@ -209,6 +226,9 @@ export default function Leaderboard({
           );
           const visibleHistory = pastClaims.slice(0, 5);
           const extraHistory = pastClaims.length - visibleHistory.length;
+          const isExpanded = expandedIso === entry.isoCode;
+
+          const toggleExpanded = () => setExpandedIso((current) => (current === entry.isoCode ? null : entry.isoCode));
 
           return (
             <article
@@ -218,7 +238,19 @@ export default function Leaderboard({
                 highlightedIso === entry.isoCode ? "border-accent ring-2 ring-accent" : "border-border"
               }`}
             >
-              <div className="flex items-center gap-3 p-4">
+              <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={isExpanded}
+                onClick={toggleExpanded}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    toggleExpanded();
+                  }
+                }}
+                className="flex cursor-pointer items-center gap-3 p-4"
+              >
                 <span className="w-6 shrink-0 text-right font-mono text-sm text-muted">{index + 1}</span>
                 <Flag alpha2={entry.isoCode} width={32} />
                 <div className="min-w-0 flex-1">
@@ -234,7 +266,10 @@ export default function Leaderboard({
                   </div>
                   <button
                     type="button"
-                    onClick={() => onVote(entry.isoCode)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onVote(entry.isoCode);
+                    }}
                     disabled={submitting || votedHere}
                     className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
                   >
@@ -247,94 +282,131 @@ export default function Leaderboard({
                 <div className="h-full bg-accent" style={{ width: `${Math.min(100, pct)}%` }} />
               </div>
 
-              <div className="border-t border-border bg-black/15 p-4">
-                {hasLeader && throne ? (
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                        {throne.logoUrl && (
+              {/* Animated accordion body — grid-template-rows 0fr/1fr is the
+                  CSS-only way to transition to "auto" height smoothly. */}
+              <div
+                className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                  isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="border-t border-border bg-black/15 p-4">
+                    {hasLeader && throne ? (
+                      <div className="flex flex-col gap-3">
+                        {throne.postImageUrl && (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={throne.logoUrl} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                          <img
+                            src={throne.postImageUrl}
+                            alt=""
+                            className="w-full rounded-xl object-cover"
+                            style={{ maxHeight: 320 }}
+                          />
                         )}
-                        <a
-                          href={`https://x.com/${throne.handle}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-medium text-foreground hover:text-accent"
-                        >
-                          {throne.brandTitle || `@${throne.handle}`}
-                        </a>
-                        <span className="text-muted-2">paid</span>
-                        <span className="font-mono font-medium text-accent">
-                          {formatMoney(throne.currentValue ?? 0)}
-                        </span>
-                        <ReportButton throneClaimId={throne.currentClaimId ?? 0} compact />
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                              {throne.logoUrl && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={throne.logoUrl}
+                                  alt=""
+                                  className="h-5 w-5 shrink-0 rounded-full object-cover"
+                                />
+                              )}
+                              <a
+                                href={`https://x.com/${throne.handle}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(event) => event.stopPropagation()}
+                                className="font-medium text-foreground hover:text-accent"
+                              >
+                                {throne.brandTitle || `@${throne.handle}`}
+                              </a>
+                              <span className="text-muted-2">paid</span>
+                              <span className="font-mono font-medium text-accent">
+                                {formatMoney(throne.currentValue ?? 0)}
+                              </span>
+                              <span onClick={(event) => event.stopPropagation()}>
+                                <ReportButton throneClaimId={throne.currentClaimId ?? 0} compact />
+                              </span>
+                            </div>
+                            {throne.description && <p className="text-xs text-muted">{throne.description}</p>}
+                            {throne.linkUrl && (
+                              <a
+                                href={throne.linkUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(event) => event.stopPropagation()}
+                                className="truncate text-xs text-muted-2 hover:text-accent"
+                              >
+                                {throne.linkUrl}
+                              </a>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-[11px] text-muted-2">Reign ends in</p>
+                              <CountdownTimer
+                                target={throne.cycleEnd ?? 0}
+                                now={now}
+                                className="font-mono text-sm text-foreground"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenClaimIso(openClaimIso === entry.isoCode ? null : entry.isoCode);
+                              }}
+                              className="rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
+                            >
+                              Take the throne ({formatMoney(requiredMinimum(throne))})
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      {throne.description && <p className="text-xs text-muted">{throne.description}</p>}
-                      {throne.linkUrl && (
-                        <a
-                          href={throne.linkUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="truncate text-xs text-muted-2 hover:text-accent"
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-muted-2">No leader yet — base price {formatMoney(requiredMinimum(throne))}</p>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenClaimIso(openClaimIso === entry.isoCode ? null : entry.isoCode);
+                          }}
+                          className="rounded-full bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25"
                         >
-                          {throne.linkUrl}
-                        </a>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <p className="text-[11px] text-muted-2">Reign ends in</p>
-                        <CountdownTimer
-                          target={throne.cycleEnd ?? 0}
-                          now={now}
-                          className="font-mono text-sm text-foreground"
+                          Claim this country ({formatMoney(requiredMinimum(throne))})
+                        </button>
+                      </div>
+                    )}
+
+                    {visibleHistory.length > 0 && (
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                        {visibleHistory.map((past) => (
+                          <span key={past.id} className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-muted">
+                            @{past.handle} · {formatMoney(past.amountPaid)}
+                          </span>
+                        ))}
+                        {extraHistory > 0 && (
+                          <span className="px-1 text-[11px] text-muted-2">History (+{extraHistory})</span>
+                        )}
+                      </div>
+                    )}
+
+                    {openClaimIso === entry.isoCode && (
+                      <div onClick={(event) => event.stopPropagation()}>
+                        <ThroneClaimModal
+                          isoCode={entry.isoCode}
+                          countryName={entry.name}
+                          throne={throne}
+                          onClose={() => setOpenClaimIso(null)}
+                          onClaimed={onThroneClaimed}
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setOpenClaimIso(openClaimIso === entry.isoCode ? null : entry.isoCode)}
-                        className="rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
-                      >
-                        Take the throne ({formatMoney(requiredMinimum(throne))})
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-muted-2">No leader yet</p>
-                    <button
-                      type="button"
-                      onClick={() => setOpenClaimIso(openClaimIso === entry.isoCode ? null : entry.isoCode)}
-                      className="rounded-full bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25"
-                    >
-                      Claim this country ({formatMoney(requiredMinimum(throne))})
-                    </button>
-                  </div>
-                )}
-
-                {visibleHistory.length > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    {visibleHistory.map((past) => (
-                      <span key={past.id} className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-muted">
-                        @{past.handle} · {formatMoney(past.amountPaid)}
-                      </span>
-                    ))}
-                    {extraHistory > 0 && (
-                      <span className="px-1 text-[11px] text-muted-2">History (+{extraHistory})</span>
                     )}
                   </div>
-                )}
-
-                {openClaimIso === entry.isoCode && (
-                  <ThroneClaimModal
-                    isoCode={entry.isoCode}
-                    countryName={entry.name}
-                    throne={throne}
-                    onClose={() => setOpenClaimIso(null)}
-                    onClaimed={onThroneClaimed}
-                  />
-                )}
+                </div>
               </div>
             </article>
           );

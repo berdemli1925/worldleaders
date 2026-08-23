@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import WorldMap from "@/components/WorldMap";
 
 export default function Home() {
@@ -11,9 +9,6 @@ export default function Home() {
           <p className="max-w-xl text-sm text-muted">
             Vote for your country, watch the ranking shift, and see who&apos;s currently sitting on the throne.
           </p>
-          <Link href="/champions" className="text-sm text-muted underline-offset-4 hover:text-accent hover:underline">
-            See past months&apos; champions →
-          </Link>
         </div>
         <WorldMap />
       </main>

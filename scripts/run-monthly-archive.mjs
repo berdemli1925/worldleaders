@@ -41,10 +41,14 @@ async function main() {
     await client.query(`select archive_and_reset_month();`);
   }
 
+  // month::text avoids node-postgres parsing the `date` column into a JS
+  // Date anchored at local midnight — formatting that via toISOString()
+  // (UTC) can roll the displayed month back a day depending on the local
+  // timezone offset, even though the stored value itself is correct.
   const { rows } = await client.query(
     targetMonth
-      ? `select month, rank, country_iso_code, vote_count from monthly_champions where month = $1::date order by rank;`
-      : `select month, rank, country_iso_code, vote_count from monthly_champions order by month desc, rank asc limit 3;`,
+      ? `select month::text as month, rank, country_iso_code, vote_count, leader_x_handle from monthly_champions where month = $1::date order by rank;`
+      : `select month::text as month, rank, country_iso_code, vote_count, leader_x_handle from monthly_champions order by month desc, rank asc limit 3;`,
     targetMonth ? [targetMonth] : [],
   );
 
@@ -53,9 +57,10 @@ async function main() {
       `No votes found for ${targetMonth ?? "last month"} — nothing archived (this is expected if that month had zero votes).`,
     );
   } else {
-    console.log(`Archived champions for ${rows[0].month.toISOString().slice(0, 7)}:`);
+    console.log(`Archived champions for ${rows[0].month.slice(0, 7)}:`);
     for (const row of rows) {
-      console.log(`  #${row.rank}  ${row.country_iso_code}  ${row.vote_count} votes`);
+      const leader = row.leader_x_handle ? `, led by @${row.leader_x_handle}` : "";
+      console.log(`  #${row.rank}  ${row.country_iso_code}  ${row.vote_count} votes${leader}`);
     }
   }
 

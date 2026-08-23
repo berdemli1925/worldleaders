@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import Flag from "@/components/Flag";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -15,6 +14,16 @@ interface ChampionRow {
   iso_code: string;
   name: string;
   vote_count: number;
+  // Whoever held this country's throne at the moment the month was
+  // archived — a snapshot, not a live link (throne cycles are weekly and
+  // independent of this monthly reset). Null if it was vacant then.
+  leader_x_handle: string | null;
+  leader_brand_title: string | null;
+  leader_amount_paid: number | null;
+}
+
+function formatMoney(amount: number): string {
+  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // `month` is a plain date column with no time component. Parsing it as UTC
@@ -49,7 +58,7 @@ export default async function ChampionsPage() {
   // reading the view definition to know the order.
   const { data, error } = await supabaseAdmin
     .from("champions")
-    .select("month, rank, iso_code, name, vote_count")
+    .select("month, rank, iso_code, name, vote_count, leader_x_handle, leader_brand_title, leader_amount_paid")
     .order("month", { ascending: false })
     .order("rank", { ascending: true });
 
@@ -65,9 +74,6 @@ export default async function ChampionsPage() {
     <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-8 sm:py-12">
       <main className="flex w-full max-w-4xl flex-col gap-6">
         <div className="flex flex-col items-center gap-2 text-center">
-          <Link href="/" className="text-sm text-muted hover:text-foreground">
-            ← Back to rankings
-          </Link>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Champions</h1>
           <p className="max-w-xl text-sm text-muted">
             The top 3 countries archived at the end of each month, right when the ranking resets.
@@ -87,7 +93,7 @@ export default async function ChampionsPage() {
                 <h2 className="mb-3 text-sm font-medium text-muted">{monthLabel(month)}</h2>
                 <div className="flex flex-col gap-2">
                   {monthRows.map((row) => (
-                    <div key={`${month}-${row.rank}`} className="flex items-center gap-3">
+                    <div key={`${month}-${row.rank}`} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span
                         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border font-mono text-xs font-semibold ${
                           RANK_BADGE_STYLE[row.rank] ?? RANK_BADGE_STYLE[3]
@@ -99,6 +105,24 @@ export default async function ChampionsPage() {
                       <span className="min-w-0 flex-1 truncate font-medium text-foreground">{row.name}</span>
                       <span className="font-mono text-sm text-muted">
                         {row.vote_count.toLocaleString("en-US")} vote{row.vote_count === 1 ? "" : "s"}
+                      </span>
+                      <span className="w-full pl-9 text-xs text-muted-2 sm:w-auto sm:pl-0">
+                        {row.leader_x_handle ? (
+                          <>
+                            Led by{" "}
+                            <a
+                              href={`https://x.com/${row.leader_x_handle}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-muted hover:text-accent"
+                            >
+                              {row.leader_brand_title || `@${row.leader_x_handle}`}
+                            </a>
+                            {row.leader_amount_paid !== null && ` · paid ${formatMoney(row.leader_amount_paid)}`}
+                          </>
+                        ) : (
+                          "No leader at the time"
+                        )}
                       </span>
                     </div>
                   ))}

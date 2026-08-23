@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
+import { mapThroneRow, type ThroneClaimHistoryEntry, type ThroneEntry, type ThroneRow } from "@/lib/throne";
 import { useVote } from "@/lib/use-vote";
 import Leaderboard, { type LeaderboardEntry } from "./Leaderboard";
 import LeaderTicker, { type TickerItem } from "./LeaderTicker";
@@ -120,28 +120,7 @@ export default function Dashboard({ countries, width, height }: DashboardProps) 
     ]);
 
     if (!throneError && throneRows) {
-      setThrones(
-        throneRows.map((row) => ({
-          isoCode: row.country_iso_code as string,
-          basePrice: row.base_price as number,
-          currentValue: row.current_value as number | null,
-          currentClaimId: row.current_claim_id as number | null,
-          cycleStart: row.cycle_start ? new Date(row.cycle_start as string).getTime() : null,
-          cycleEnd: row.cycle_end ? new Date(row.cycle_end as string).getTime() : null,
-          handle: row.x_handle as string | null,
-          amountPaid: row.amount_paid as number | null,
-          postText: row.post_text as string | null,
-          postAuthorName: row.post_author_name as string | null,
-          postAuthorAvatarUrl: row.post_author_avatar_url as string | null,
-          postImageUrl: row.post_image_url as string | null,
-          postCreatedAt: row.post_created_at ? new Date(row.post_created_at as string).getTime() : null,
-          brandTitle: row.brand_title as string | null,
-          description: row.description as string | null,
-          linkUrl: row.link_url as string | null,
-          logoUrl: row.logo_url as string | null,
-          claimedAt: row.claimed_at ? new Date(row.claimed_at as string).getTime() : null,
-        })),
-      );
+      setThrones((throneRows as ThroneRow[]).map(mapThroneRow));
     }
 
     if (!claimError && claimRows) {

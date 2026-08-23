@@ -10,6 +10,7 @@ import { verifyPostUnchanged } from "@/lib/x-post";
 // see vercel.json — but is a plain HTTP route, so it's also testable by
 // hand any time:
 //   curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/check-active-leaders
+//   curl -H "Authorization: Bearer $CRON_SECRET" https://worldleaders.lol/api/cron/check-active-leaders
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const auth = request.headers.get("authorization");
