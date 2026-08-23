@@ -2,19 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { findBannedWord } from "@/lib/banned-words";
 import { getClientIp } from "@/lib/get-client-ip";
+import { getPaymentProvider } from "@/lib/payments";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchTweetSnapshot } from "@/lib/x-post";
 
-// Free "test mode" claim — no payment provider wired up yet (see
-// proje-spesifikasyonu.md section 5 and this session's chat, which
-// overrides some of the spec's numbers: 1-week cycles that outbidding
-// doesn't extend, a flat +$2 minimum raise with no cap). All the actual
-// business logic (vacancy check, minimum-raise validation, credit math,
-// cycle timing, blocked-handle/kill-switch gating) lives in the
-// claim_throne() Postgres function — see scripts/setup-moderation.mjs — so
-// it's atomic under concurrent claims instead of split across several
-// round-trips here. The two checks that need no DB state (sensitive post,
-// banned words) happen here first, before that round-trip.
+// Claim flow, now payment-gated (see scripts/setup-payments.mjs): a
+// `payments` row is created ('pending') before anything provider-specific
+// happens, the active PaymentProvider (src/lib/payments) is asked to
+// create the payment, and — for a provider that resolves synchronously
+// (the mock provider always does, "test mode always succeeds") —
+// finalize_payment() is called immediately, which is the only place a
+// throne is ever actually granted (via claim_throne(), server-side,
+// re-validated against the live thrones row regardless of what this
+// route computed a moment earlier). A redirect-based real provider would
+// instead return `checkoutUrl` here and let its webhook
+// (/api/payments/webhook/[provider]) call finalize_payment() later.
+//
+// The two checks that need no DB state (sensitive post, banned words)
+// still happen here first, before a payment row (or any charge) exists.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const countryIsoCode = typeof body?.countryIsoCode === "string" ? body.countryIsoCode : null;
@@ -36,8 +41,10 @@ export async function POST(request: NextRequest) {
   }
 
   // Always re-fetch server-side — never trust a snapshot the client claims
-  // to have already fetched. This is the one and only place a claim's
-  // stored post data comes from.
+  // to have already fetched, or the amount it displayed. This is the one
+  // and only place a claim's stored post data comes from; the amount
+  // itself is re-validated again below, inside claim_throne(), against
+  // whatever the throne is actually worth at finalize time.
   const snapshot = await fetchTweetSnapshot(tweetUrl);
   if (!snapshot.ok) {
     return NextResponse.json({ error: snapshot.reason }, { status: 422 });
@@ -59,39 +66,72 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = getClientIp(request);
+  const provider = getPaymentProvider();
 
-  const { data, error } = await supabaseAdmin.rpc("claim_throne", {
-    p_country: countryIsoCode,
-    p_x_handle: snapshot.authorHandle,
-    p_offered: offeredAmount,
-    p_post_snapshot: snapshot.raw,
-    p_post_text: snapshot.text,
-    p_post_author_name: snapshot.authorName,
-    p_post_author_avatar_url: snapshot.authorAvatarUrl,
-    p_post_image_url: snapshot.imageUrl,
-    p_post_created_at: snapshot.createdAt,
-    p_claimer_ip: ip,
-    p_brand_title: brandTitle,
-    p_description: description,
-    p_link_url: linkUrl,
-    p_logo_url: logoUrl,
+  const { data: paymentRow, error: insertError } = await supabaseAdmin
+    .from("payments")
+    .insert({
+      country_iso_code: countryIsoCode,
+      x_handle: snapshot.authorHandle,
+      amount: offeredAmount,
+      provider: provider.name,
+      post_snapshot: snapshot.raw,
+      post_text: snapshot.text,
+      post_author_name: snapshot.authorName,
+      post_author_avatar_url: snapshot.authorAvatarUrl,
+      post_image_url: snapshot.imageUrl,
+      post_created_at: snapshot.createdAt,
+      brand_title: brandTitle,
+      description,
+      link_url: linkUrl,
+      logo_url: logoUrl,
+      claimer_ip: ip,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !paymentRow) {
+    return NextResponse.json({ error: insertError?.message ?? "Could not start payment." }, { status: 500 });
+  }
+  const paymentId = paymentRow.id as number;
+
+  const outcome = await provider.createPayment({
+    paymentId,
+    countryIsoCode,
+    xHandle: snapshot.authorHandle,
+    amount: offeredAmount,
+    description: `World Leaders throne claim: ${countryIsoCode}`,
   });
 
-  if (error) {
-    // claim_throne() raises a plain-text exception for "unknown country" and
-    // "offer below minimum" — both are the caller's fault, not a server
-    // error, so surface the message as-is rather than a generic 500.
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  await supabaseAdmin.from("payments").update({ provider_reference: outcome.providerReference }).eq("id", paymentId);
+
+  // Redirect-based provider (no immediate result) — the payment stays
+  // 'pending' until its webhook calls finalize_payment().
+  if (outcome.checkoutUrl && !outcome.immediateResult) {
+    return NextResponse.json({ status: "pending", checkoutUrl: outcome.checkoutUrl });
   }
 
-  const { data: throneRow, error: readError } = await supabaseAdmin
-    .from("thrones_with_leader")
-    .select("*")
-    .eq("country_iso_code", countryIsoCode)
-    .maybeSingle();
-  if (readError) {
-    return NextResponse.json({ error: readError.message }, { status: 500 });
+  const { data: result, error: finalizeError } = await supabaseAdmin.rpc("finalize_payment", {
+    p_payment_id: paymentId,
+    p_provider_success: outcome.immediateResult?.ok ?? false,
+  });
+  if (finalizeError) {
+    return NextResponse.json({ error: finalizeError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ claimId: data, throne: throneRow });
+  const finalStatus = (result as { status?: string } | null)?.status;
+  if (finalStatus === "completed") {
+    const { data: throneRow, error: readError } = await supabaseAdmin
+      .from("thrones_with_leader")
+      .select("*")
+      .eq("country_iso_code", countryIsoCode)
+      .maybeSingle();
+    if (readError) {
+      return NextResponse.json({ error: readError.message }, { status: 500 });
+    }
+    return NextResponse.json({ status: "completed", throne: throneRow });
+  }
+
+  const reason = (result as { reason?: string } | null)?.reason ?? "Payment failed.";
+  return NextResponse.json({ status: "failed", error: reason }, { status: 400 });
 }

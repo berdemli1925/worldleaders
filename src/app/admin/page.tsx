@@ -3,7 +3,12 @@ import { cookies } from "next/headers";
 
 import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import AdminDashboard, { type ActiveLeader, type BlockedHandle, type ModerationReport } from "./AdminDashboard";
+import AdminDashboard, {
+  type ActiveLeader,
+  type BlockedHandle,
+  type ModerationReport,
+  type PaymentRow,
+} from "./AdminDashboard";
 import AdminLoginForm from "./AdminLoginForm";
 
 // noindex/nofollow at the page level — the reliable de-indexing control.
@@ -18,19 +23,30 @@ export const metadata: Metadata = {
 // views — those views mask everything when the kill switch is on, which is
 // exactly the state an admin needs to see through, not be subject to.
 async function loadAdminData() {
-  const [{ data: thrones }, { data: reports }, { data: blocked }, { data: settings }] = await Promise.all([
-    supabaseAdmin
-      .from("thrones")
-      .select("country_iso_code, base_price, current_value, current_claim_id, cycle_start, cycle_end")
-      .not("current_claim_id", "is", null),
-    supabaseAdmin
-      .from("moderation_reports")
-      .select("id, throne_claim_id, reason, details, created_at")
-      .is("resolved_at", null)
-      .order("created_at", { ascending: false }),
-    supabaseAdmin.from("blocked_handles").select("x_handle, reason, blocked_at").order("blocked_at", { ascending: false }),
-    supabaseAdmin.from("site_settings").select("value").eq("key", "leadership_hidden").maybeSingle(),
-  ]);
+  const [{ data: thrones }, { data: reports }, { data: blocked }, { data: settings }, { data: payments }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("thrones")
+        .select("country_iso_code, base_price, current_value, current_claim_id, cycle_start, cycle_end")
+        .not("current_claim_id", "is", null),
+      supabaseAdmin
+        .from("moderation_reports")
+        .select("id, throne_claim_id, reason, details, created_at")
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("blocked_handles")
+        .select("x_handle, reason, blocked_at")
+        .order("blocked_at", { ascending: false }),
+      supabaseAdmin.from("site_settings").select("value").eq("key", "leadership_hidden").maybeSingle(),
+      supabaseAdmin
+        .from("payments")
+        .select(
+          "id, country_iso_code, x_handle, amount, credit_applied, net_amount, provider, provider_reference, status, failure_reason, created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
 
   const claimIds = (thrones ?? []).map((t) => t.current_claim_id as number);
   const { data: claims } =
@@ -79,7 +95,21 @@ async function loadAdminData() {
 
   const leadershipHidden = settings?.value === true;
 
-  return { activeLeaders, moderationReports, blockedHandles, leadershipHidden };
+  const paymentRows: PaymentRow[] = (payments ?? []).map((p) => ({
+    id: p.id as number,
+    country: p.country_iso_code as string,
+    handle: p.x_handle as string,
+    amount: p.amount as number,
+    creditApplied: p.credit_applied as number | null,
+    netAmount: p.net_amount as number | null,
+    provider: p.provider as string,
+    providerReference: p.provider_reference as string | null,
+    status: p.status as "pending" | "completed" | "failed",
+    failureReason: p.failure_reason as string | null,
+    createdAt: p.created_at as string,
+  }));
+
+  return { activeLeaders, moderationReports, blockedHandles, leadershipHidden, paymentRows };
 }
 
 export default async function AdminPage() {

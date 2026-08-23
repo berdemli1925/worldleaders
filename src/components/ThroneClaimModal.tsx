@@ -100,8 +100,19 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Claim failed.");
-      onClaimed();
-      onClose();
+
+      if (data.status === "completed") {
+        onClaimed();
+        onClose();
+        return;
+      }
+      if (data.status === "pending" && data.checkoutUrl) {
+        // Redirect-based provider — not reachable with the mock provider,
+        // kept for when a real one is wired in.
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      throw new Error(data.error ?? "Payment failed.");
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Claim failed.");
     } finally {

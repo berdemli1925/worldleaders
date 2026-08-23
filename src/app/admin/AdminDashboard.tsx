@@ -28,11 +28,26 @@ export interface BlockedHandle {
   blockedAt: string;
 }
 
+export interface PaymentRow {
+  id: number;
+  country: string;
+  handle: string;
+  amount: number;
+  creditApplied: number | null;
+  netAmount: number | null;
+  provider: string;
+  providerReference: string | null;
+  status: "pending" | "completed" | "failed";
+  failureReason: string | null;
+  createdAt: string;
+}
+
 interface AdminDashboardProps {
   activeLeaders: ActiveLeader[];
   moderationReports: ModerationReport[];
   blockedHandles: BlockedHandle[];
   leadershipHidden: boolean;
+  paymentRows: PaymentRow[];
 }
 
 function formatMoney(amount: number): string {
@@ -53,11 +68,18 @@ async function post(url: string, body?: unknown): Promise<{ ok: boolean; error?:
   return { ok: false, error: data?.error ?? `Request failed (${res.status}).` };
 }
 
+function statusClasses(status: PaymentRow["status"]): string {
+  if (status === "completed") return "bg-accent/15 text-accent";
+  if (status === "failed") return "bg-danger/15 text-danger";
+  return "bg-surface-hover text-muted";
+}
+
 export default function AdminDashboard({
   activeLeaders,
   moderationReports,
   blockedHandles,
   leadershipHidden,
+  paymentRows,
 }: AdminDashboardProps) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -243,6 +265,37 @@ export default function AdminDashboard({
               >
                 Unblock
               </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold text-foreground">Payments (last {paymentRows.length})</h2>
+        {paymentRows.length === 0 && <p className="text-sm text-muted">No payments yet.</p>}
+        <div className="flex flex-col gap-2">
+          {paymentRows.map((payment) => (
+            <div key={payment.id} className="rounded-2xl border border-border bg-surface p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">
+                    {payment.country} — @{payment.handle}
+                    <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${statusClasses(payment.status)}`}>
+                      {payment.status}
+                    </span>
+                  </p>
+                  <p className="mt-1 font-mono text-xs text-muted">
+                    {formatMoney(payment.amount)}
+                    {payment.creditApplied !== null && ` · credit ${formatMoney(payment.creditApplied)}`}
+                    {payment.netAmount !== null && ` · net ${formatMoney(payment.netAmount)}`}
+                    {" · "}
+                    {payment.provider}
+                    {payment.providerReference ? ` (${payment.providerReference})` : ""}
+                  </p>
+                  {payment.failureReason && <p className="mt-1 text-xs text-danger">{payment.failureReason}</p>}
+                  <p className="mt-1 text-xs text-muted-2">{new Date(payment.createdAt).toLocaleString("en-US")}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
