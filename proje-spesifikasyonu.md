@@ -1,158 +1,179 @@
-# Dünya Ülkeleri Oylama Sitesi — Proje Spesifikasyonu
+# WORLD LEADERS — Proje Spesifikasyonu
 
-**Sürüm:** 1.0 (Adım 1 çıktısı)
-**Durum:** Kararlar netleşti, inşaya hazır
+**Alan adı:** worldleaders.lol
+**Sürüm:** 3.0
+**Değişiklik:** Haftalık taht döngüsü, +$2 artış kuralı, kredi sistemi, tavan yok
 
 ---
 
 ## 1. Konsept
 
-Dünya ülkelerinin oy ile yarıştığı, interaktif dünya haritası üzerinden çalışan bir sıralama platformu. Kullanıcılar ücretsiz oy verir. Ayrıca ödeme yaparak bir ülkenin 30 dakikalık "lideri" olabilir ve o süre boyunca kendi X gönderisini o ülkenin üstünde herkese gösterebilir.
+Dünya ülkelerinin oy ile yarıştığı, interaktif dünya haritası üzerinden çalışan bir sıralama platformu. Kullanıcılar ücretsiz oy verir. Ayrıca ödeme yaparak bir ülkenin "leader"ı olur; X gönderisi, markası ve bağlantısı o ülkenin üstünde herkese görünür.
 
-**İlham alınan model:** memleket.lol (81 il / Şehrin Ağası)
-**Temel farklar:** Dünya geneli · Süreli liderlik (kalıcı değil) · X gönderisi gösterimi · Aylık sıfırlanan sıralama
+**İlham:** memleket.lol
+**Farklar:** Dünya geneli (250 ülke) · X gönderisi zorunlu · Aylık sıfırlanan sıralama · İngilizce arayüz
 
 ---
 
 ## 2. Ülke Listesi
 
-- **Kaynak:** ISO 3166-1 standardı (yaklaşık 249 kayıt)
-- **Liste sabittir.** Kullanıcı yeni ülke ekleyemez.
-- **Önemli:** Tartışmalı bölgelerin dahil olup olmaması konusunda "biz X standardını kullanıyoruz, bu bir siyasi tercih değildir" ifadesi Kurallar sayfasında açıkça yer almalı.
+- Kaynak: ISO 3166-1 (~250 kayıt), liste sabit
+- Kurallar sayfasında standart açıkça belirtilir, siyasi tercih olmadığı yazılır
 
 ---
 
-## 3. Oylama Sistemi
+## 3. Oylama
 
 | Kural | Değer |
 |---|---|
 | Ücret | Ücretsiz |
-| Sınır | IP adresi başına **günde 1 oy** |
+| Sınır | IP + tarayıcı parmak izi başına günde 1 oy |
 | Üyelik | Yok |
-| Bot koruması | Cloudflare Turnstile (görünmez) |
-| Sıralama dönemi | **Her ayın 1'inde sıfırlanır** |
+| Bot koruması | Cloudflare Turnstile (Invisible mod) |
+| Sıfırlama | Her ayın 1'i, UTC |
 
-### Ek tablolar
-- **Bu ay** (ana sıralama — fiyatlandırma buna göre)
-- **Tüm zamanlar** (kümülatif, sadece gösterim amaçlı)
-- **Şampiyonlar** (geçmiş ayların kazananları — arşiv sayfası)
+Ek tablolar: **This month** (ana) · **All time** · **Champions** (geçmiş ay kazananları)
 
 ---
 
-## 4. Fiyatlandırma
+## 4. Liderlik ve Fiyatlandırma
+
+### Süre — haftalık taht döngüsü
+- Taht, ilk alındığı andan itibaren **1 hafta** sürer.
+- **Devralmalar süreyi uzatmaz.** Hafta ilk alımda başlar.
+- Süre dolunca: taht boşalır, ülke taban fiyatına döner, **tüm krediler sıfırlanır.**
+- Oy sıralaması ayrıca her ayın 1'inde sıfırlanır (bu iki mekanizma birbirinden bağımsızdır).
 
 ### Taban fiyat (aylık sıralamadaki yere göre)
 
-| Sıralama | Taban fiyat |
+| Sıralama | Taban |
 |---|---|
 | 1 – 10 | $3.00 |
 | 11 – 30 | $2.50 |
 | 31 – 70 | $2.00 |
-| 71 ve altı | **$1.50** |
+| 71+ | $1.50 |
 
-- Fiyatlar **saatte bir** güncellenir (kullanıcı ödeme yaparken fiyat elinde değişmesin diye).
-- **Ay başı istisnası:** Ayın ilk 24 saatinde fiyatlar önceki ayın sıralamasına göre hesaplanır.
+Saatte bir güncellenir. Ayın ilk 24 saatinde önceki ayın sıralaması kullanılır.
 
-### Devralma (outbidding)
+### Devralma ve kredi sistemi
+- Her hamle, mevcut taht değerinin **en az $2 üstüne** çıkmalıdır.
+- Kullanıcı dilerse daha fazlasını ödeyebilir.
+- **Tavan yoktur.**
+- **Kredi:** Bir kullanıcının o ülkede daha önce ödediği tutar kredi olarak durur. Tahtı geri alırken yeni taht değerinden kredisi düşülür, sadece farkı öder.
+- Krediler ülkeye özeldir ve taht döngüsü bitince sıfırlanır.
+- Fazla ödemek koruma satın alır — arayüzde belirtilir:
+  *"Paying more raises the price others must pay to take your throne."*
 
-- Aktif lider varken, tahtı devralmak için **o an ödenmiş tutarın 2 katı** ödenir.
-- **Tavan: $30.** Bu tutara ulaşıldığında ülke o 30 dakika boyunca kilitlenir, kimse devralamaz.
-- Devralınca **süre sıfırdan başlar** (yeni 30 dakika).
-- 30 dakika bitince ülke kendi taban fiyatına döner.
+**Örnek (taban $3):**
 
-**Örnek katlanma zinciri (taban $1.50):**
-$1.50 → $3 → $6 → $12 → $24 → $30 (kilit)
+| Hamle | Taht değeri | Kredi | Nakit ödenen |
+|---|---|---|---|
+| A alır | $3 | – | $3 |
+| B devralır | $5 | – | $5 |
+| A geri alır | $7 | $3 | $4 |
+| B geri alır | $9 | $5 | $4 |
+| C girer | $11 | – | $11 |
 
-### İade politikası
+### İade
+**İade yoktur.** Ödeme ekranında zorunlu onay kutusuyla kabul ettirilir. Kural ihlali hâlinde içerik iadesiz kaldırılır.
 
-- **İade yoktur.** Süresi dolmadan devrilen kullanıcıya iade yapılmaz.
-- Bu kural ödeme ekranında **büyük ve okunur** şekilde gösterilir ve kullanıcı bir onay kutusunu işaretlemeden ödeme yapamaz.
-- Bu, ödeme itirazlarına (chargeback) karşı en önemli savunmadır.
-
-### Komisyon gerçeği (bilgi amaçlı)
-
-Aracı komisyonu yaklaşık %5 + $0.50. $1.50'lık satışta yaklaşık **$0.92** kalır. Hacim arttıkça ve devralmalar yaşandıkça ortalama işlem tutarı yükselir.
+### Komisyon
+MoR aracısı ~%5 + $0.50. Minimum artışın $2 olmasının sebebi budur: daha küçük tutarlarda komisyon geliri yutar.
 
 ---
 
-## 5. Liderlik ve İçerik
+## 5. Lider İçeriği
 
-### Akış
-1. Kullanıcı içeriğini önce **X'te paylaşır**
-2. Gönderi bağlantısını siteye yapıştırır
-3. Önizlemeyi görür, ödemeyi yapar
-4. 30 dakika boyunca gönderi o ülkenin üstünde herkese görünür
-5. Kullanıcı adı (@handle) görünür → hesap verebilirlik
+### Kabul edilenler
+- **X gönderisi — zorunlu.** Liderlik bu olmadan alınamaz.
+- Marka / başlık
+- Açıklama veya slogan
+- Web sitesi, X profili veya Instagram bağlantısı
+- Logo (bağlantıdan otomatik çekilir veya elle girilir)
 
-### Neden bu model
-Kullanıcıyı X'te paylaşım yapmaya zorlar → her lider siteyi tanıtmış olur. Ücretsiz büyüme döngüsü.
+### Gösterim
+- Ülke kartında: marka, açıklama, bağlantı, ödenen tutar
+- **Alt bantta ve kart içinde: X gönderisi görseliyle birlikte açıkça görüntülenir**
+- Haritada: liderin avatarı / kullanıcı adı
+- "Past leaders" listesi kalıcıdır, kullanıcı adı ve tutar saklanır
 
 ### Zorunlu güvenlik önlemleri
 
-> Bu bölüm atlanamaz. Kullanıcı içeriğini herkese açık gösteren her sitenin taşıması gereken asgari koruma.
+> Gönderi görselinin tam boy yayınlanması, moderasyon riskini ciddi şekilde artırır. Bu maddeler pazarlık dışıdır.
 
-- **Anlık kopya (snapshot):** Gönderi satın alma anında çekilip veritabanına kaydedilir; sitede bu kopya gösterilir.
-- **Değişiklik kontrolü:** Orijinal gönderi 1–2 dakikada bir kontrol edilir. Silinmiş veya düzenlenmişse içerik otomatik kaldırılır.
-  *Gerekçe: X Premium kullanıcıları gönderilerini düzenleyebiliyor ve düzenleme penceresi 30 dakikalık liderlik süresini kapsıyor. Bu kontrol olmadan sistem açıktır.*
-- **Kelime filtresi:** Otomatik metin taraması.
-- **Şikayet butonu:** Her gösterilen içeriğin altında.
-- **Yönetim paneli:** Tek tıkla içerik kaldırma ve kullanıcı engelleme.
+- **Snapshot:** Gönderi satın alma anında çekilip veritabanına kaydedilir; sitede kopya gösterilir
+- **Değişiklik kontrolü:** Orijinal 1–2 dakikada bir kontrol edilir; silinmiş veya düzenlenmişse içerik otomatik kaldırılır
+  *(X Premium kullanıcıları gönderilerini düzenleyebiliyor)*
+- **Hassas içerik reddi:** X tarafından "sensitive" işaretli gönderiler kabul edilmez
+- **Kelime filtresi:** Otomatik metin taraması
+- **Şikayet butonu:** Her görünen içerikte
+- **Yönetim paneli:** Tek tıkla kaldırma ve engelleme
+- **Vaat verilmez:** "Anında ve onaysız yayında" gibi ifadeler kullanılmaz
 
 ### Teknik risk
-X'in gömme (embed) altyapısı istikrarsız; özellikle "hassas" işaretli gönderiler gömülemeyebiliyor. **Yedek plan:** Gönderi verisini kendi sunucumuzda saklayıp kendi tasarımımızla göstermek.
+X'in gömme altyapısı istikrarsız. **Yedek plan:** gönderi verisini kendi sunucumuzda saklayıp kendi tasarımımızla göstermek.
 
 ---
 
-## 6. Harita
+## 6. Liderlik Satın Alma Ekranı (Modal)
 
-- Zoom in / zoom out
-- Sürükleyerek gezinme
-- Tüm ülkeler tıklanabilir
-- Oy oranına göre dinamik renklenme
-- Aktif lideri olan ülkelerde görsel işaret (taç/çerçeve vb.)
-- Mobil uyumlu (dokunmatik zoom)
+**1 — Durum**
+Bayrak, ülke adı, sıralama. Taht doluysa: mevcut liderin markası, X kullanıcı adı, ödediği tutar, minimum devralma bedeli.
 
----
+**2 — İçerik girişi**
+X gönderi bağlantısı (zorunlu) · marka/başlık · açıklama · web/sosyal bağlantı · logo.
+"Preview" butonu → gönderi modal içinde önizlenir. **Önizleme yapılmadan ödeme aktif olmaz.**
 
-## 7. Ödeme Altyapısı
+**3 — Teklif**
+Minimum tutar gösterilir. Hazır butonlar (min / min+$2 / min+$5) + serbest giriş. Girilen tutara göre "başkasının ödemesi gereken tutar" canlı hesaplanır.
 
-- **Model:** Her seferinde tek tek ödeme (kredi paketi yok)
-- **Sağlayıcı:** Merchant of Record aracısı (Paddle / Lemon Squeezy vb.)
-- **Gerekçe:** Stripe Türkiye'deki şirketlere doğrudan hesap açmıyor. MoR aracıları global tahsilatı ve KDV/vergi yükümlülüğünü üstleniyor.
-- **Not:** Sağlayıcı koşulları değişebilir; seçim aşamasında güncel şartlar teyit edilmeli.
+**4 — Kurallar**
+Taht 1 hafta sürer · Devralma = mevcut değer + en az $2 · Geri alırken kredi düşülür · Süre bitince taht ve krediler sıfırlanır · Kullanıcı adı "Past leaders"ta kalıcı kalır · İade yoktur
 
----
-
-## 8. Sayfalar
-
-| Sayfa | İçerik |
-|---|---|
-| Ana sayfa | Harita + canlı sıralama + canlı sayaçlar |
-| Liderler | O an aktif liderlerin listesi |
-| Şampiyonlar | Geçmiş ayların kazananları |
-| Hakkında | Proje tanıtımı |
-| Kurallar | Oy kuralları, fiyat kuralları, iade politikası, ülke listesi açıklaması |
-| Yönetim | (Gizli) İçerik moderasyon paneli |
+**5 — Onay**
+Zorunlu onay kutusu: tahtın devralınabileceği, iade yapılmayacağı, kural ihlalinde içeriğin iadesiz kaldırılabileceği. İşaretlenmeden ödeme aktif olmaz.
 
 ---
 
-## 9. İnşa Sırası
+## 7. Ana Sayfa Düzeni
+
+- **Üst bar:** toplam oy · anlık online · sıralamanın sıfırlanmasına kalan süre · toplam hacim *(açık karar: gelir kamuya açık olsun mu?)*
+- **Harita:** zoom, sürükleme, tıklama, oy oranına göre renklenme, liderli ülkelerde avatar
+- **Alt bant:** sabit, sağdan sola kayan şerit — aktif liderler, gönderi görselleriyle. Hover'da durur, tıklanınca ülkeye gider
+- **Arama:** ülke adı veya ISO kodu
+- **Filtreler:** All / Has leader / No leader (sayılarla) + kıtalar
+- **Sıralama kartları:** sıra, bayrak, ülke, başkent, oy, yüzde, dolgu çubuğu, Vote butonu, lider bölümü, past leaders rozetleri
+
+---
+
+## 8. Ödeme
+
+Tek tek ödeme. Merchant of Record aracısı (Paddle / Lemon Squeezy). Stripe Türkiye'deki şirketlere doğrudan hesap açmıyor.
+
+---
+
+## 9. Sayfalar
+
+Ana sayfa · Leaders · Champions · About · Rules · Admin (gizli)
+
+---
+
+## 10. İnşa Sırası
 
 | Adım | İçerik | Durum |
 |---|---|---|
-| 1 | Kararların netleştirilmesi | ✅ Tamamlandı |
-| 2 | Statik harita (tıklanabilir, zoom'lu — oy/para yok) | Sıradaki |
-| 3 | Oylama + veritabanı + canlı sıralama | |
-| 4 | Liderlik sistemi + X entegrasyonu + moderasyon paneli | |
-| 5 | Ödeme entegrasyonu | |
+| 1 | Kararlar | Tamamlandı |
+| 2 | Harita (tıklanabilir, zoom, canlı) | Tamamlandı |
+| 3 | Oylama, koruma, sıralama | 3E kaldı |
+| — | Tasarım turu | Tamamlandı |
+| 4 | Liderlik + X entegrasyonu + moderasyon paneli | Sıradaki |
+| 5 | Ödeme | |
 | 6 | Yayın ve tanıtım | |
 
 ---
 
-## 10. Açık Konular
+## 11. Açık Konular
 
-- Alan adı seçimi
-- Site adı
-- Arayüz dili (Türkçe / İngilizce / çift dil) — global hedef için İngilizce ağırlıklı olması mantıklı
-- Şirket kurulumu / vergi durumu (gelir oluşmaya başladığında)
-- IP bazlı oylamanın alternatifleri (CGNAT ve VPN zafiyeti mevcut)
+- Toplam hacim kamuya açık gösterilsin mi?
+- Şirket kurulumu (Adım 5 öncesi) — şahıs işletmesi, genç girişimci istisnası
+- Masaüstü uygulaması kararlılık sorunu (destek talebi)

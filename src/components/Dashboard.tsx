@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-import { getMockLeaderData, type MockLeader } from "@/lib/mock-leaders";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import { useVote } from "@/lib/use-vote";
 import Leaderboard, { type LeaderboardEntry } from "./Leaderboard";
 import LeaderTicker, { type TickerItem } from "./LeaderTicker";
@@ -19,6 +19,7 @@ interface DashboardProps {
 }
 
 const VOTES_CHANNEL = "votes-updates";
+const THRONES_CHANNEL = "thrones-updates";
 const PRESENCE_CHANNEL = "online-visitors";
 const HIGHLIGHT_DURATION_MS = 2200;
 
@@ -29,9 +30,13 @@ function nextUtcMidnight(from: number): number {
 
 export default function Dashboard({ countries, width, height }: DashboardProps) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [allTimeEntries, setAllTimeEntries] = useState<LeaderboardEntry[]>([]);
+  const [thrones, setThrones] = useState<ThroneEntry[]>([]);
+  const [claimHistory, setClaimHistory] = useState<ThroneClaimHistoryEntry[]>([]);
   const [onlineCount, setOnlineCount] = useState(1);
   const [highlightedIso, setHighlightedIso] = useState<string | null>(null);
   const votesChannelRef = useRef<RealtimeChannel | null>(null);
+  const thronesChannelRef = useRef<RealtimeChannel | null>(null);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
@@ -48,22 +53,32 @@ export default function Dashboard({ countries, width, height }: DashboardProps) 
     return () => clearInterval(id);
   }, []);
 
-  const fetchLeaderboard = useCallback(async () => {
-    const { data, error } = await supabaseBrowser
-      .from("leaderboard")
-      .select("iso_code, name, continent, vote_count");
-    if (error || !data) return;
+  // Shared by both rankings below — "leaderboard" (this UTC month, the main
+  // ranking) and "leaderboard_all_time" (cumulative, backs the "All time"
+  // tab) are two Supabase views with the identical column shape, differing
+  // only in whether vote_count is date-scoped. See scripts/setup-monthly-archive.mjs.
+  const fetchRanking = useCallback(async (view: "leaderboard" | "leaderboard_all_time") => {
+    const { data, error } = await supabaseBrowser.from(view).select("iso_code, name, continent, vote_count");
+    if (error || !data) return null;
 
-    const mapped: LeaderboardEntry[] = data
+    return (data as { iso_code: string; name: string; continent: string; vote_count: number }[])
       .map((row) => ({
-        isoCode: row.iso_code as string,
-        name: row.name as string,
-        continent: row.continent as string,
-        voteCount: row.vote_count as number,
+        isoCode: row.iso_code,
+        name: row.name,
+        continent: row.continent,
+        voteCount: row.vote_count,
       }))
       .sort((a, b) => b.voteCount - a.voteCount || a.name.localeCompare(b.name));
-    setEntries(mapped);
   }, []);
+
+  const fetchLeaderboard = useCallback(async () => {
+    const [month, allTime] = await Promise.all([
+      fetchRanking("leaderboard"),
+      fetchRanking("leaderboard_all_time"),
+    ]);
+    if (month) setEntries(month);
+    if (allTime) setAllTimeEntries(allTime);
+  }, [fetchRanking]);
 
   // Initial load. fetchLeaderboard is an async data-fetching call (setState
   // only happens after the network response, inside its own .then/promise
@@ -86,6 +101,83 @@ export default function Dashboard({ countries, width, height }: DashboardProps) 
       votesChannelRef.current = null;
     };
   }, [fetchLeaderboard]);
+
+  // thrones_with_leader (current state, one row per country) and
+  // throne_claims_public (full history, for the "past leaders" badges) —
+  // see scripts/setup-throne-system.mjs for both views' shapes.
+  const fetchThrones = useCallback(async () => {
+    const [{ data: throneRows, error: throneError }, { data: claimRows, error: claimError }] = await Promise.all([
+      supabaseBrowser
+        .from("thrones_with_leader")
+        .select(
+          "country_iso_code, base_price, current_value, current_claim_id, cycle_start, cycle_end, x_handle, amount_paid, post_text, post_author_name, post_author_avatar_url, post_image_url, post_created_at, brand_title, description, link_url, logo_url, claimed_at",
+        ),
+      supabaseBrowser
+        .from("throne_claims_public")
+        .select("id, country_iso_code, x_handle, amount_paid, created_at")
+        .order("created_at", { ascending: false })
+        .limit(2000),
+    ]);
+
+    if (!throneError && throneRows) {
+      setThrones(
+        throneRows.map((row) => ({
+          isoCode: row.country_iso_code as string,
+          basePrice: row.base_price as number,
+          currentValue: row.current_value as number | null,
+          currentClaimId: row.current_claim_id as number | null,
+          cycleStart: row.cycle_start ? new Date(row.cycle_start as string).getTime() : null,
+          cycleEnd: row.cycle_end ? new Date(row.cycle_end as string).getTime() : null,
+          handle: row.x_handle as string | null,
+          amountPaid: row.amount_paid as number | null,
+          postText: row.post_text as string | null,
+          postAuthorName: row.post_author_name as string | null,
+          postAuthorAvatarUrl: row.post_author_avatar_url as string | null,
+          postImageUrl: row.post_image_url as string | null,
+          postCreatedAt: row.post_created_at ? new Date(row.post_created_at as string).getTime() : null,
+          brandTitle: row.brand_title as string | null,
+          description: row.description as string | null,
+          linkUrl: row.link_url as string | null,
+          logoUrl: row.logo_url as string | null,
+          claimedAt: row.claimed_at ? new Date(row.claimed_at as string).getTime() : null,
+        })),
+      );
+    }
+
+    if (!claimError && claimRows) {
+      setClaimHistory(
+        claimRows.map((row) => ({
+          id: row.id as number,
+          isoCode: row.country_iso_code as string,
+          handle: row.x_handle as string,
+          amountPaid: row.amount_paid as number,
+          createdAt: new Date(row.created_at as string).getTime(),
+        })),
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchThrones();
+  }, [fetchThrones]);
+
+  // Same broadcast-ping pattern as VOTES_CHANNEL — ThroneClaimForm sends
+  // this after a successful claim so every open tab refetches.
+  useEffect(() => {
+    const channel = supabaseBrowser.channel(THRONES_CHANNEL);
+    channel.on("broadcast", { event: "throne-claimed" }, () => fetchThrones()).subscribe();
+    thronesChannelRef.current = channel;
+    return () => {
+      supabaseBrowser.removeChannel(channel);
+      thronesChannelRef.current = null;
+    };
+  }, [fetchThrones]);
+
+  const handleThroneClaimed = useCallback(() => {
+    fetchThrones();
+    thronesChannelRef.current?.send({ type: "broadcast", event: "throne-claimed", payload: {} });
+  }, [fetchThrones]);
 
   // Presence channel: every open tab tracks itself; the online count is just
   // the size of the resulting presence set. Ephemeral, not stored in Postgres.
@@ -130,19 +222,21 @@ export default function Dashboard({ countries, width, height }: DashboardProps) 
   const voteCounts = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.voteCount])), [entries]);
   const resetTarget = useMemo(() => (now !== null ? nextUtcMidnight(now) : null), [now]);
 
+  const countryNameByIso = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.name])), [entries]);
+
   const tickerItems = useMemo<TickerItem[]>(() => {
-    return entries
-      .map((entry) => ({ entry, leader: getMockLeaderData(entry.isoCode).leader }))
-      .filter((row): row is { entry: LeaderboardEntry; leader: MockLeader } => row.leader !== null)
-      .sort((a, b) => b.leader.amountPaid - a.leader.amountPaid)
+    return thrones
+      .filter((throne) => throne.currentValue !== null && throne.handle)
+      .sort((a, b) => (b.currentValue ?? 0) - (a.currentValue ?? 0))
       .slice(0, 24)
-      .map(({ entry, leader }) => ({
-        isoCode: entry.isoCode,
-        countryName: entry.name,
-        handle: leader.handle,
-        amountPaid: leader.amountPaid,
+      .map((throne) => ({
+        isoCode: throne.isoCode,
+        countryName: countryNameByIso.get(throne.isoCode) ?? throne.isoCode,
+        handle: throne.handle as string,
+        throneClaimId: throne.currentClaimId as number,
+        amountPaid: throne.currentValue as number,
       }));
-  }, [entries]);
+  }, [thrones, countryNameByIso]);
 
   const handleTickerSelect = useCallback((isoCode: string) => {
     setHighlightedIso(isoCode);
@@ -169,6 +263,7 @@ export default function Dashboard({ countries, width, height }: DashboardProps) 
       </div>
       <Leaderboard
         entries={entries}
+        allTimeEntries={allTimeEntries}
         totalVotes={totalVotes}
         now={now}
         voteStatus={voteStatus}
@@ -176,6 +271,9 @@ export default function Dashboard({ countries, width, height }: DashboardProps) 
         voteError={voteError}
         onVote={castVote}
         highlightedIso={highlightedIso}
+        thrones={thrones}
+        claimHistory={claimHistory}
+        onThroneClaimed={handleThroneClaimed}
       />
       <LeaderTicker items={tickerItems} onSelect={handleTickerSelect} />
     </div>

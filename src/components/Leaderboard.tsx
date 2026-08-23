@@ -3,10 +3,12 @@
 import { useMemo, useState } from "react";
 
 import { getCountryMeta } from "@/lib/country-meta";
-import { getMockLeaderData } from "@/lib/mock-leaders";
+import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import CountdownTimer from "./CountdownTimer";
 import Flag from "./Flag";
+import ReportButton from "./ReportButton";
+import ThroneClaimModal from "./ThroneClaimModal";
 
 export interface LeaderboardEntry {
   isoCode: string;
@@ -17,6 +19,7 @@ export interface LeaderboardEntry {
 
 interface LeaderboardProps {
   entries: LeaderboardEntry[];
+  allTimeEntries: LeaderboardEntry[];
   totalVotes: number;
   now: number | null;
   voteStatus: MyVoteStatus | null;
@@ -24,6 +27,9 @@ interface LeaderboardProps {
   voteError: string | null;
   onVote: (isoCode: string) => void;
   highlightedIso: string | null;
+  thrones: ThroneEntry[];
+  claimHistory: ThroneClaimHistoryEntry[];
+  onThroneClaimed: () => void;
 }
 
 const CONTINENTS = ["All", "Europe", "Asia", "Africa", "Americas", "Oceania"] as const;
@@ -31,12 +37,19 @@ type ContinentFilter = (typeof CONTINENTS)[number];
 
 type LeaderFilter = "all" | "has" | "none";
 
+type Period = "month" | "allTime";
+const PERIODS: [Period, string][] = [
+  ["month", "This month"],
+  ["allTime", "All time"],
+];
+
 function formatMoney(amount: number): string {
   return `$${amount.toLocaleString("en-US")}`;
 }
 
 export default function Leaderboard({
   entries,
+  allTimeEntries,
   totalVotes,
   now,
   voteStatus,
@@ -44,33 +57,62 @@ export default function Leaderboard({
   voteError,
   onVote,
   highlightedIso,
+  thrones,
+  claimHistory,
+  onThroneClaimed,
 }: LeaderboardProps) {
   const [search, setSearch] = useState("");
   const [continent, setContinent] = useState<ContinentFilter>("All");
   const [leaderFilter, setLeaderFilter] = useState<LeaderFilter>("all");
+  const [period, setPeriod] = useState<Period>("month");
+  const [openClaimIso, setOpenClaimIso] = useState<string | null>(null);
+
+  const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
+
+  // claimHistory arrives sorted newest-first (see Dashboard's fetch) —
+  // grouping preserves that order, so each country's list is already
+  // newest-first without re-sorting here.
+  const historyByIso = useMemo(() => {
+    const map = new Map<string, ThroneClaimHistoryEntry[]>();
+    for (const claim of claimHistory) {
+      const list = map.get(claim.isoCode);
+      if (list) list.push(claim);
+      else map.set(claim.isoCode, [claim]);
+    }
+    return map;
+  }, [claimHistory]);
+
+  const activeEntries = period === "month" ? entries : allTimeEntries;
+  // `totalVotes` from the parent is already this-month's sum (it also drives
+  // the top stat bar) — reuse it for that tab instead of re-summing, and only
+  // compute the all-time sum here since nothing else needs it.
+  const periodTotalVotes = useMemo(
+    () => (period === "month" ? totalVotes : allTimeEntries.reduce((sum, entry) => sum + entry.voteCount, 0)),
+    [period, totalVotes, allTimeEntries],
+  );
 
   const withLeaderInfo = useMemo(
     () =>
-      entries.map((entry) => ({
+      activeEntries.map((entry) => ({
         entry,
         meta: getCountryMeta(entry.isoCode),
-        leaderData: getMockLeaderData(entry.isoCode),
+        throne: throneByIso.get(entry.isoCode),
       })),
-    [entries],
+    [activeEntries, throneByIso],
   );
 
   const hasLeaderCount = useMemo(
-    () => withLeaderInfo.filter((row) => row.leaderData.leader !== null).length,
+    () => withLeaderInfo.filter((row) => !isVacant(row.throne)).length,
     [withLeaderInfo],
   );
   const noLeaderCount = withLeaderInfo.length - hasLeaderCount;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = withLeaderInfo.filter(({ entry, leaderData }) => {
+    const list = withLeaderInfo.filter(({ entry, throne }) => {
       if (continent !== "All" && entry.continent !== continent) return false;
-      if (leaderFilter === "has" && leaderData.leader === null) return false;
-      if (leaderFilter === "none" && leaderData.leader !== null) return false;
+      if (leaderFilter === "has" && isVacant(throne)) return false;
+      if (leaderFilter === "none" && !isVacant(throne)) return false;
       if (q && !entry.name.toLowerCase().includes(q) && !entry.isoCode.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -81,7 +123,27 @@ export default function Leaderboard({
 
   return (
     <section className="flex w-full flex-col gap-4">
-      <h2 className="text-lg font-semibold text-foreground">Leaderboard</h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-semibold text-foreground">Leaderboard</h2>
+        <div className="flex gap-1.5" role="tablist" aria-label="Ranking period">
+          {PERIODS.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={period === value}
+              onClick={() => setPeriod(value)}
+              className={
+                period === value
+                  ? "rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                  : "rounded-full border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <input
         type="search"
@@ -136,13 +198,17 @@ export default function Leaderboard({
       </div>
 
       <div className="flex w-full flex-col gap-3">
-        {filtered.map(({ entry, meta, leaderData }, index) => {
-          const pct = totalVotes > 0 ? (entry.voteCount / totalVotes) * 100 : 0;
+        {filtered.map(({ entry, meta, throne }, index) => {
+          const pct = periodTotalVotes > 0 ? (entry.voteCount / periodTotalVotes) * 100 : 0;
           const votedHere = voteStatus?.votedCountryIsoCode === entry.isoCode;
           const submitting = submittingIso === entry.isoCode;
           const voteLabel = submitting ? "Voting…" : votedHere ? "Voted" : "Vote";
-          const visibleHistory = leaderData.history.slice(0, 5);
-          const extraHistory = leaderData.history.length - visibleHistory.length;
+          const hasLeader = !isVacant(throne);
+          const pastClaims = (historyByIso.get(entry.isoCode) ?? []).filter(
+            (claim) => claim.id !== throne?.currentClaimId,
+          );
+          const visibleHistory = pastClaims.slice(0, 5);
+          const extraHistory = pastClaims.length - visibleHistory.length;
 
           return (
             <article
@@ -182,38 +248,55 @@ export default function Leaderboard({
               </div>
 
               <div className="border-t border-border bg-black/15 p-4">
-                {leaderData.leader ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                      <a
-                        href={`https://x.com/${leaderData.leader.handle}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-medium text-foreground hover:text-accent"
-                      >
-                        @{leaderData.leader.handle}
-                      </a>
-                      <span className="text-muted-2">paid</span>
-                      <span className="font-mono font-medium text-accent">
-                        {formatMoney(leaderData.leader.amountPaid)}
-                      </span>
+                {hasLeader && throne ? (
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                        {throne.logoUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={throne.logoUrl} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                        )}
+                        <a
+                          href={`https://x.com/${throne.handle}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-foreground hover:text-accent"
+                        >
+                          {throne.brandTitle || `@${throne.handle}`}
+                        </a>
+                        <span className="text-muted-2">paid</span>
+                        <span className="font-mono font-medium text-accent">
+                          {formatMoney(throne.currentValue ?? 0)}
+                        </span>
+                        <ReportButton throneClaimId={throne.currentClaimId ?? 0} compact />
+                      </div>
+                      {throne.description && <p className="text-xs text-muted">{throne.description}</p>}
+                      {throne.linkUrl && (
+                        <a
+                          href={throne.linkUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="truncate text-xs text-muted-2 hover:text-accent"
+                        >
+                          {throne.linkUrl}
+                        </a>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <p className="text-[11px] text-muted-2">Reign ends in</p>
                         <CountdownTimer
-                          target={leaderData.leader.expiresAt}
+                          target={throne.cycleEnd ?? 0}
                           now={now}
                           className="font-mono text-sm text-foreground"
                         />
                       </div>
                       <button
                         type="button"
-                        disabled
-                        title="Leader system isn't live yet"
-                        className="cursor-not-allowed rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent opacity-60"
+                        onClick={() => setOpenClaimIso(openClaimIso === entry.isoCode ? null : entry.isoCode)}
+                        className="rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
                       >
-                        Take the throne ({formatMoney(leaderData.leader.amountPaid * 2)})
+                        Take the throne ({formatMoney(requiredMinimum(throne))})
                       </button>
                     </div>
                   </div>
@@ -222,22 +305,18 @@ export default function Leaderboard({
                     <p className="text-sm text-muted-2">No leader yet</p>
                     <button
                       type="button"
-                      disabled
-                      title="Leader system isn't live yet"
-                      className="cursor-not-allowed rounded-full bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent opacity-60"
+                      onClick={() => setOpenClaimIso(openClaimIso === entry.isoCode ? null : entry.isoCode)}
+                      className="rounded-full bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25"
                     >
-                      Claim this country ({formatMoney(leaderData.basePrice)})
+                      Claim this country ({formatMoney(requiredMinimum(throne))})
                     </button>
                   </div>
                 )}
 
                 {visibleHistory.length > 0 && (
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    {visibleHistory.map((past, historyIndex) => (
-                      <span
-                        key={`${past.handle}-${historyIndex}`}
-                        className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-muted"
-                      >
+                    {visibleHistory.map((past) => (
+                      <span key={past.id} className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-muted">
                         @{past.handle} · {formatMoney(past.amountPaid)}
                       </span>
                     ))}
@@ -245,6 +324,16 @@ export default function Leaderboard({
                       <span className="px-1 text-[11px] text-muted-2">History (+{extraHistory})</span>
                     )}
                   </div>
+                )}
+
+                {openClaimIso === entry.isoCode && (
+                  <ThroneClaimModal
+                    isoCode={entry.isoCode}
+                    countryName={entry.name}
+                    throne={throne}
+                    onClose={() => setOpenClaimIso(null)}
+                    onClaimed={onThroneClaimed}
+                  />
                 )}
               </div>
             </article>

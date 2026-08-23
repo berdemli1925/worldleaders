@@ -1,10 +1,12 @@
 import Flag from "./Flag";
+import ReportButton from "./ReportButton";
 
 export interface TickerItem {
   isoCode: string;
   countryName: string;
   handle: string;
   amountPaid: number;
+  throneClaimId: number;
 }
 
 interface LeaderTickerProps {
@@ -16,19 +18,26 @@ function TickerRow({ items, onSelect, hidden }: { items: TickerItem[]; onSelect:
   return (
     <div className="flex shrink-0 items-center" aria-hidden={hidden || undefined}>
       {items.map((item, index) => (
-        <button
+        <div
           key={`${item.isoCode}-${index}`}
-          type="button"
+          role="button"
           tabIndex={hidden ? -1 : 0}
           onClick={() => onSelect(item.isoCode)}
-          className="flex shrink-0 items-center gap-2 border-r border-border px-4 py-2.5 text-sm hover:bg-surface-hover"
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onSelect(item.isoCode);
+            }
+          }}
+          className="flex shrink-0 cursor-pointer items-center gap-2 border-r border-border px-4 py-2.5 text-sm hover:bg-surface-hover"
         >
           <Flag alpha2={item.isoCode} width={18} />
           <span className="font-medium text-foreground">{item.countryName}</span>
           <span className="text-muted-2">·</span>
           <span className="text-muted">@{item.handle}</span>
           <span className="font-mono font-semibold text-accent">${item.amountPaid.toLocaleString("en-US")}</span>
-        </button>
+          {!hidden && <ReportButton throneClaimId={item.throneClaimId} compact />}
+        </div>
       ))}
     </div>
   );
