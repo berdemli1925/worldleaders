@@ -64,6 +64,13 @@ const countryPaths: CountryPath[] = countryFeatures.map((country, index) => {
   };
 });
 
-export default function WorldMap() {
-  return <Dashboard countries={countryPaths} width={WIDTH} height={HEIGHT} />;
+interface WorldMapProps {
+  /** ISO code to scroll-to and expand on mount — see page.tsx's ?country= handling. */
+  initialHighlightIso?: string;
+}
+
+export default function WorldMap({ initialHighlightIso }: WorldMapProps) {
+  return (
+    <Dashboard countries={countryPaths} width={WIDTH} height={HEIGHT} initialHighlightIso={initialHighlightIso} />
+  );
 }

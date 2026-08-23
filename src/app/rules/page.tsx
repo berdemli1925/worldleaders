@@ -5,7 +5,6 @@ export const metadata: Metadata = {
   description: "Voting rules, leadership rules, pricing, and refund policy.",
 };
 
-// Draft copy adapted from the project spec — replace with your own wording.
 // Kept in sync with what's actually implemented (see proje-spesifikasyonu.md
 // and the throne/voting system code) rather than the older 30-min/2x-cap
 // numbers from an earlier draft of the spec.
@@ -15,7 +14,7 @@ export default function RulesPage() {
       <main className="flex w-full max-w-2xl flex-col gap-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Rules</h1>
-          <p className="max-w-xl text-sm text-muted">Draft copy — edit freely.</p>
+          <p className="max-w-xl text-sm text-muted">Voting, leadership, pricing, and refunds.</p>
         </div>
 
         <div className="flex flex-col gap-8 rounded-2xl border border-border bg-surface p-6 text-sm text-muted">
@@ -70,6 +69,17 @@ export default function RulesPage() {
               <li>There are no refunds. If you&apos;re outbid before your week is up, you don&apos;t get your money
                 back — it stays as credit toward reclaiming the country instead.</li>
               <li>Content removed for breaking the rules is not refunded.</li>
+            </ul>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="text-base font-semibold text-foreground">The country list</h2>
+            <ul className="list-inside list-disc space-y-1">
+              <li>The ~250 countries and territories on this site follow the ISO 3166-1 standard, and continent
+                groupings follow the UN geoscheme.</li>
+              <li>This is a technical convention used for consistency and completeness — it is{" "}
+                <strong className="text-foreground">not</strong> a political statement about sovereignty,
+                territorial disputes, or the recognition of any government or boundary.</li>
             </ul>
           </section>
         </div>

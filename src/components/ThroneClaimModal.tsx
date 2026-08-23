@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { track } from "@/lib/analytics";
 import { requiredMinimum, type ThroneEntry } from "@/lib/throne";
 
 interface ThroneClaimModalProps {
@@ -53,6 +54,20 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // "Opened" fires once, on mount — mounting this component IS opening the
+  // modal, from either of its two call sites (Leaderboard.tsx / WorldMapInteractive.tsx).
+  // "Abandoned" fires on unmount unless a claim just completed, tracked via
+  // this ref rather than state so the cleanup closure always reads the
+  // latest value without needing to be in the effect's dependency array.
+  const completedRef = useRef(false);
+  useEffect(() => {
+    track("leadership_modal_opened", { country: isoCode });
+    return () => {
+      if (!completedRef.current) track("leadership_modal_abandoned", { country: isoCode });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const contentKey = JSON.stringify([tweetUrl, brandTitle, description]);
   const previewIsCurrent = previewStatus === "ok" && previewedFor === contentKey;
 
@@ -102,6 +117,8 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
       if (!res.ok) throw new Error(data?.error ?? "Claim failed.");
 
       if (data.status === "completed") {
+        completedRef.current = true;
+        track("leadership_claim_completed", { country: isoCode, amount });
         onClaimed();
         onClose();
         return;

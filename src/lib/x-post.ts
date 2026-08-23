@@ -1,9 +1,8 @@
 // Fetches an X/Twitter post's data without authentication, via the same
 // unofficial-but-stable syndication endpoint X's own embed widget script
-// uses (see src/app/dev/x-test — this was tested there first). Server-only:
-// never call this from a "use client" file. Used both by the diagnostic
-// preview route and by the throne-claim route, so a claim's snapshot is
-// fetched with the exact same logic that was tested.
+// uses. Server-only: never call this from a "use client" file. Used by
+// both /api/throne/preview and /api/throne/claim, so a claim's snapshot is
+// fetched with the exact same logic the modal previewed.
 
 export function extractTweetId(input: string): string | null {
   const match = input.match(/(?:twitter|x)\.com\/(?:#!\/)?\w+\/status(?:es)?\/(\d+)/i);
@@ -13,8 +12,6 @@ export function extractTweetId(input: string): string | null {
 // Reverse-engineered token X's widgets.js sends to the syndication endpoint.
 // Undocumented, but stable and widely relied on by open-source embed
 // libraries (e.g. Vercel's react-tweet). No API key or login involved.
-// Exported so src/app/api/x-preview (the diagnostic dual-endpoint dump)
-// can reuse it without duplicating the formula.
 export function syndicationToken(tweetId: string): string {
   return ((Number(tweetId) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
 }

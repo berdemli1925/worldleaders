@@ -36,6 +36,17 @@ type ContinentFilter = (typeof CONTINENTS)[number];
 
 type LeaderFilter = "all" | "has" | "none";
 
+// Opens an X share-intent window pre-filled with a link back to this
+// country (?country=XX, read by page.tsx's generateMetadata for the
+// per-country OG card — see /api/og/country) — no popup blocked, since
+// this only ever runs from a direct click.
+function shareOnX(isoCode: string, countryName: string, rank: number, voteCount: number): void {
+  const url = `https://worldleaders.lol/?country=${isoCode}`;
+  const text = `${countryName} is ranked #${rank} on World Leaders with ${voteCount.toLocaleString("en-US")} votes.`;
+  const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+  window.open(intentUrl, "_blank", "noopener,noreferrer");
+}
+
 type Period = "month" | "allTime";
 const PERIODS: [Period, string][] = [
   ["month", "This month"],
@@ -240,6 +251,33 @@ export default function Leaderboard({
                     </p>
                     <p className="font-mono text-xs text-muted">{pct.toFixed(1)}%</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      shareOnX(entry.isoCode, entry.name, index + 1, entry.voteCount);
+                    }}
+                    aria-label={`Share ${entry.name} on X`}
+                    title="Share on X"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width={14}
+                      height={14}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="18" cy="5" r="3" />
+                      <circle cx="6" cy="12" r="3" />
+                      <circle cx="18" cy="19" r="3" />
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                    </svg>
+                  </button>
                   <button
                     type="button"
                     onClick={(event) => {

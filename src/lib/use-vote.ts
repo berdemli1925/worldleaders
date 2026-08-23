@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { track } from "@/lib/analytics";
 import { getFingerprint } from "@/lib/fingerprint";
 
 export interface MyVoteStatus {
@@ -68,6 +69,7 @@ export function useVote({ getTurnstileToken, onVoteCast }: UseVoteOptions = {}) 
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error ?? "Vote failed.");
         setStatus({ votedToday: true, votedCountryIsoCode: isoCode });
+        track("vote_cast", { country: isoCode });
         onVoteCast?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Vote failed.");

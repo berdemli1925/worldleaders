@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
+import AnalyticsInit from "@/components/AnalyticsInit";
+import SiteFooter from "@/components/SiteFooter";
 import SiteNav from "@/components/SiteNav";
 
 const displayFont = Space_Grotesk({
@@ -21,15 +23,19 @@ const monoFont = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://worldleaders.lol"),
   title: "World Leaders",
-  description: "Vote for your favorite country on an interactive world map.",
+  description:
+    "Vote for your favorite country on an interactive world map, or pay to become its temporary leader by linking an X post.",
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${displayFont.variable} ${monoFont.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <AnalyticsInit />
         <SiteNav />
         {children}
+        <SiteFooter />
       </body>
     </html>
   );

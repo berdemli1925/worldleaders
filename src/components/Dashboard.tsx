@@ -16,6 +16,8 @@ interface DashboardProps {
   countries: CountryPath[];
   width: number;
   height: number;
+  /** ISO code to scroll-to and expand once the leaderboard has loaded — see WorldMap.tsx. */
+  initialHighlightIso?: string;
 }
 
 const VOTES_CHANNEL = "votes-updates";
@@ -28,7 +30,7 @@ function nextUtcMidnight(from: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 }
 
-export default function Dashboard({ countries, width, height }: DashboardProps) {
+export default function Dashboard({ countries, width, height, initialHighlightIso }: DashboardProps) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [allTimeEntries, setAllTimeEntries] = useState<LeaderboardEntry[]>([]);
   const [thrones, setThrones] = useState<ThroneEntry[]>([]);
@@ -222,6 +224,18 @@ export default function Dashboard({ countries, width, height }: DashboardProps) 
     document.getElementById(`country-${isoCode}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     window.setTimeout(() => setHighlightedIso((current) => (current === isoCode ? null : current)), HIGHLIGHT_DURATION_MS);
   }, []);
+
+  // A shared-link visit (?country=XX, from the leaderboard row share
+  // button) should land on and expand that country the same way clicking
+  // its ticker entry does — reuses the same highlight/scroll logic, just
+  // deferred until the leaderboard has actually loaded rows to scroll to,
+  // and applied only once.
+  const appliedInitialHighlight = useRef(false);
+  useEffect(() => {
+    if (!initialHighlightIso || appliedInitialHighlight.current || entries.length === 0) return;
+    appliedInitialHighlight.current = true;
+    handleTickerSelect(initialHighlightIso);
+  }, [initialHighlightIso, entries, handleTickerSelect]);
 
   return (
     <div className="flex w-full flex-col gap-6 pb-16">
