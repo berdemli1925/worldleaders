@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { twitterImageVariant } from "@/lib/twitter-image";
 import { voteCountToColor } from "@/lib/vote-color-scale";
@@ -67,10 +67,29 @@ interface HoverState {
   y: number;
 }
 
+export interface WorldMapHandle {
+  /** Pans/zooms to fit the given ISO alpha-2 country and opens its side panel — used by the leaderboard search box and row clicks (see Dashboard.tsx). No-op if the code isn't on the map (see WorldMap.tsx's 50m comment — a handful of very small territories still have no geometry). */
+  focusCountry: (isoCode: string) => void;
+}
+
 const MIN_SCALE = 1;
-const MAX_SCALE = 8;
+// High enough that a small-but-real country (Malta, Andorra, Luxembourg, …)
+// fills a good part of the viewport when focusCountry below zooms to fit
+// it — border rendering stays exactly as crisp here as at MIN_SCALE, since
+// borders are plain SVG paths with vectorEffect="non-scaling-stroke", not a
+// raster layer. A literal handful of micro-states (Vatican City, Monaco)
+// are a fraction of a viewBox unit wide even at 50m resolution (see
+// WorldMap.tsx) and will still render small at this cap — no zoom range is
+// going to make a ~1px-wide country fill the screen without also zooming
+// into its neighbors, so this is picked to serve the common case well
+// rather than chase that unreachable one.
+const MAX_SCALE = 250;
 const WHEEL_ZOOM_FACTOR = 1.2;
 const BUTTON_ZOOM_FACTOR = 1.4;
+// Duration of the programmatic pan/zoom transition triggered by
+// focusCountry (search box / leaderboard row / ticker selection) — never
+// applied to live wheel/drag/pinch input, which stays 1:1 with the pointer.
+const FOCUS_TRANSITION_MS = 450;
 // Below this much cumulative pointer movement (in CSS pixels), a press+release
 // is treated as a click/tap on a country rather than a pan gesture.
 const CLICK_THRESHOLD = 6;
@@ -97,31 +116,41 @@ function clampScale(scale: number) {
 }
 
 function clampTranslate(t: Point, scale: number, width: number, height: number): Point {
-  // Generous bound that just keeps the map from being dragged completely out
-  // of view — not a pixel-perfect edge lock.
-  const marginX = (width * scale) / 2;
-  const marginY = (height * scale) / 2;
+  // All content lives in [0,width] x [0,height] (that's what fitSize in
+  // WorldMap.tsx guarantees) — centering a point p at scale s means
+  // t = width/2 - p*s, so p ranging over [0,width] needs t in
+  // [width/2 - width*s, width/2]. Below is exactly that range, symmetric at
+  // scale 1 with the old ±(width*scale)/2 bound (so unzoomed panning is
+  // unchanged) but — unlike that old symmetric bound — still wide enough at
+  // high scale to center content on the far/positive side of the viewBox,
+  // which is what focusCountry needs for any country whose centroid sits
+  // right of center (>width/2) or below center (>height/2). A purely
+  // symmetric bound clips exactly that half of the map once scale is large
+  // enough for the asymmetry to matter.
   return {
-    x: Math.min(marginX, Math.max(-marginX, t.x)),
-    y: Math.min(marginY, Math.max(-marginY, t.y)),
+    x: Math.min(width / 2, Math.max(width / 2 - width * scale, t.x)),
+    y: Math.min(height / 2, Math.max(height / 2 - height * scale, t.y)),
   };
 }
 
-export default function WorldMapInteractive({
-  countries,
-  width,
-  height,
-  voteCounts,
-  maxVotes,
-  voteStatus,
-  submittingIso,
-  voteError,
-  onVote,
-  thrones,
-  claimHistory,
-  now,
-  onThroneClaimed,
-}: WorldMapInteractiveProps) {
+const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>(function WorldMapInteractive(
+  {
+    countries,
+    width,
+    height,
+    voteCounts,
+    maxVotes,
+    voteStatus,
+    submittingIso,
+    voteError,
+    onVote,
+    thrones,
+    claimHistory,
+    now,
+    onThroneClaimed,
+  },
+  ref,
+) {
   const svgRef = useRef<SVGSVGElement>(null);
   const pointers = useRef<Map<number, Point>>(new Map());
   const dragRef = useRef<DragState | null>(null);
@@ -130,8 +159,34 @@ export default function WorldMapInteractive({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hover, setHover] = useState<HoverState | null>(null);
   const [claimModalOpen, setClaimModalOpen] = useState(false);
+  // True only while a programmatic focusCountry jump is animating — see
+  // FOCUS_TRANSITION_MS. Cleared the instant a real gesture starts so a
+  // drag/pinch/wheel right after a jump never fights a CSS transition.
+  const [jumping, setJumping] = useState(false);
 
   const countryById = useMemo(() => new Map(countries.map((country) => [country.id, country])), [countries]);
+  // A handful of countries are split into multiple features at 50m
+  // resolution — e.g. Australia's mainland and the tiny, separately-listed
+  // Ashmore & Cartier Is. both resolve to alpha2 "AU" (see WorldMap.tsx).
+  // Keep the one with the larger bounding box so focusCountry zooms to the
+  // country itself, not to whichever piece happened to come last.
+  const countryByAlpha2 = useMemo(() => {
+    const map = new Map<string, CountryPath>();
+    for (const country of countries) {
+      if (!country.alpha2) continue;
+      const existing = map.get(country.alpha2);
+      if (!existing) {
+        map.set(country.alpha2, country);
+        continue;
+      }
+      const [ex0, ey0, ex1, ey1] = existing.bounds;
+      const [x0, y0, x1, y1] = country.bounds;
+      if ((x1 - x0) * (y1 - y0) > (ex1 - ex0) * (ey1 - ey0)) {
+        map.set(country.alpha2, country);
+      }
+    }
+    return map;
+  }, [countries]);
   const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
 
   // Which leadered countries get the full clipped post image vs. the small
@@ -209,6 +264,51 @@ export default function WorldMapInteractive({
 
   const resetView = useCallback(() => setView({ scale: 1, x: 0, y: 0 }), []);
 
+  // Clears itself after FOCUS_TRANSITION_MS — see the `jumping` state
+  // comment above.
+  useEffect(() => {
+    if (!jumping) return;
+    const id = setTimeout(() => setJumping(false), FOCUS_TRANSITION_MS);
+    return () => clearTimeout(id);
+  }, [jumping]);
+
+  // Pan/zoom to fit a country's bounds, centered, with padding — exposed via
+  // ref (see useImperativeHandle below) so the leaderboard search box and
+  // row clicks, and the leader ticker, can all send the map to a specific
+  // country without lifting pan/zoom state up into Dashboard. Also opens
+  // the side panel, same as clicking the country directly, so "go to
+  // country" always lands somewhere showing its vote/throne info.
+  const focusCountry = useCallback(
+    (isoCode: string) => {
+      const country = countryByAlpha2.get(isoCode);
+      if (!country) return; // not on the map — see WorldMap.tsx's 50m comment
+
+      const [x0, y0, x1, y1] = country.bounds;
+      // Padding around the country so it doesn't butt against the edges —
+      // ~35% of its own size on each side. Floored so a near-zero-area
+      // sliver (see MAX_SCALE comment) can't produce a runaway scale.
+      const boxWidth = Math.max(x1 - x0, 0.05);
+      const boxHeight = Math.max(y1 - y0, 0.05);
+      const fitScale = Math.min(width / (boxWidth * 1.7), height / (boxHeight * 1.7));
+      const nextScale = clampScale(fitScale);
+
+      const [cx, cy] = country.centroid;
+      const clamped = clampTranslate(
+        { x: width / 2 - cx * nextScale, y: height / 2 - cy * nextScale },
+        nextScale,
+        width,
+        height,
+      );
+
+      setSelectedId(country.id);
+      setJumping(true);
+      setView({ scale: nextScale, ...clamped });
+    },
+    [countryByAlpha2, width, height],
+  );
+
+  useImperativeHandle(ref, () => ({ focusCountry }), [focusCountry]);
+
   const zoomButton = useCallback(
     (factor: number) => () => {
       const svg = svgRef.current;
@@ -227,6 +327,7 @@ export default function WorldMapInteractive({
     if (!svg) return;
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
+      setJumping(false); // a real gesture always wins over an in-progress focusCountry animation
       const factor = event.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
       zoomAt(event.clientX, event.clientY, factor);
     };
@@ -237,6 +338,7 @@ export default function WorldMapInteractive({
   const handlePointerDown = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    setJumping(false); // a real gesture always wins over an in-progress focusCountry animation
 
     if (pointers.current.size === 1) {
       dragRef.current = {
@@ -392,7 +494,10 @@ export default function WorldMapInteractive({
             onPointerCancel={handlePointerCancel}
             onPointerLeave={handlePointerLeave}
           >
-            <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
+            <g
+              transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}
+              style={jumping ? { transition: `transform ${FOCUS_TRANSITION_MS}ms cubic-bezier(0.4,0,0.2,1)` } : undefined}
+            >
               {countries.map((country) => {
                 const isSelected = country.id === selectedId;
                 const voteCount = country.alpha2 ? (voteCounts.get(country.alpha2) ?? 0) : 0;
@@ -585,4 +690,6 @@ export default function WorldMapInteractive({
       )}
     </div>
   );
-}
+});
+
+export default WorldMapInteractive;

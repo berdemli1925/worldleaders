@@ -29,6 +29,8 @@ interface LeaderboardProps {
   thrones: ThroneEntry[];
   claimHistory: ThroneClaimHistoryEntry[];
   onThroneClaimed: () => void;
+  /** Pans/zooms the map to a country — fired on row click and on Enter in the search box. */
+  onSelectCountry: (isoCode: string) => void;
 }
 
 const CONTINENTS = ["All", "Europe", "Asia", "Africa", "Americas", "Oceania"] as const;
@@ -66,6 +68,7 @@ export default function Leaderboard({
   thrones,
   claimHistory,
   onThroneClaimed,
+  onSelectCountry,
 }: LeaderboardProps) {
   const [search, setSearch] = useState("");
   const [continent, setContinent] = useState<ContinentFilter>("All");
@@ -159,6 +162,13 @@ export default function Leaderboard({
         type="search"
         value={search}
         onChange={(event) => setSearch(event.target.value)}
+        onKeyDown={(event) => {
+          // Enter jumps the map to the top match — lets "type a name, hit
+          // enter" find a small country without scrolling the list at all.
+          if (event.key !== "Enter" || filtered.length === 0) return;
+          event.preventDefault();
+          onSelectCountry(filtered[0].entry.isoCode);
+        }}
         placeholder="Search by country name or ISO code"
         className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent"
       />
@@ -215,7 +225,10 @@ export default function Leaderboard({
           const voteLabel = submitting ? "Voting…" : votedHere ? "Voted" : "Vote";
           const isExpanded = expandedIso === entry.isoCode;
 
-          const toggleExpanded = () => setExpandedIso((current) => (current === entry.isoCode ? null : entry.isoCode));
+          const toggleExpanded = () => {
+            setExpandedIso((current) => (current === entry.isoCode ? null : entry.isoCode));
+            onSelectCountry(entry.isoCode);
+          };
 
           return (
             <article

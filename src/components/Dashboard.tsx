@@ -10,7 +10,7 @@ import Leaderboard, { type LeaderboardEntry } from "./Leaderboard";
 import LeaderTicker, { type TickerItem } from "./LeaderTicker";
 import TopBar from "./TopBar";
 import TurnstileWidget, { type TurnstileWidgetHandle } from "./TurnstileWidget";
-import WorldMapInteractive, { type CountryPath } from "./WorldMapInteractive";
+import WorldMapInteractive, { type CountryPath, type WorldMapHandle } from "./WorldMapInteractive";
 
 interface DashboardProps {
   countries: CountryPath[];
@@ -40,6 +40,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
   const votesChannelRef = useRef<RealtimeChannel | null>(null);
   const thronesChannelRef = useRef<RealtimeChannel | null>(null);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+  const mapRef = useRef<WorldMapHandle>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   // Single shared clock: every live countdown on the page (reset timer, per-
@@ -223,6 +224,16 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     setHighlightedIso(isoCode);
     document.getElementById(`country-${isoCode}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     window.setTimeout(() => setHighlightedIso((current) => (current === isoCode ? null : current)), HIGHLIGHT_DURATION_MS);
+    mapRef.current?.focusCountry(isoCode);
+  }, []);
+
+  // "Go to this country on the map" — the leaderboard search box (Enter on
+  // a match) and clicking a leaderboard row both funnel through this rather
+  // than duplicating the highlight/scroll dance above: the row is already
+  // visible/expanding itself in both cases, so this only needs to move the
+  // map, not also re-scroll/ring the leaderboard.
+  const handleSelectCountry = useCallback((isoCode: string) => {
+    mapRef.current?.focusCountry(isoCode);
   }, []);
 
   // A shared-link visit (?country=XX, from the leaderboard row share
@@ -243,6 +254,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
       <TopBar totalVotes={totalVotes} onlineCount={onlineCount} resetTarget={resetTarget} now={now} />
       <div className="w-full rounded-2xl border border-border bg-surface p-4">
         <WorldMapInteractive
+          ref={mapRef}
           countries={countries}
           width={width}
           height={height}
@@ -271,6 +283,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         thrones={thrones}
         claimHistory={claimHistory}
         onThroneClaimed={handleThroneClaimed}
+        onSelectCountry={handleSelectCountry}
       />
       <LeaderTicker items={tickerItems} onSelect={handleTickerSelect} />
     </div>

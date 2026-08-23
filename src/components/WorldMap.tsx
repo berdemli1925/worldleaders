@@ -3,14 +3,23 @@ import { feature } from "topojson-client";
 import type { Topology, GeometryCollection } from "topojson-specification";
 import { whereNumeric } from "iso-3166-1";
 
-import countriesTopology from "@/data/countries-110m.json";
+import countriesTopology from "@/data/countries-50m.json";
 import Dashboard from "./Dashboard";
 import { type CountryPath } from "./WorldMapInteractive";
 
 const WIDTH = 960;
 const HEIGHT = 500;
 
-// world-atlas's countries-110m.json ships a TopoJSON topology with a single
+// 50m rather than world-atlas's default 110m: at 110m resolution, 73 of the
+// ~250 countries in `countries` (mostly small island nations and
+// microstates — Malta, Andorra, Bahrain, Nauru, Brunei, …) have no geometry
+// at all and simply can't be shown or clicked on the map, which defeats a
+// zoom range built specifically to reach small countries. 50m recovers all
+// but a literal handful of them (Tuvalu's islets are still below even this
+// resolution) at a still-reasonable data size. See WorldMapInteractive's
+// MAX_SCALE comment for the other half of this.
+//
+// world-atlas's countries-50m.json ships a TopoJSON topology with a single
 // "countries" object — a GeometryCollection where each geometry is one country.
 const topology = countriesTopology as unknown as Topology<{
   countries: GeometryCollection;
@@ -19,12 +28,18 @@ const topology = countriesTopology as unknown as Topology<{
 const countries = feature(topology, topology.objects.countries);
 
 // features() can technically return a single Feature instead of a
-// FeatureCollection depending on the input geometry — countries-110m.json is
+// FeatureCollection depending on the input geometry — countries-50m.json is
 // always a GeometryCollection, so this is here purely to satisfy TypeScript.
 const countryFeatures = "features" in countries ? countries.features : [countries];
 
 const projection = geoNaturalEarth1().fitSize([WIDTH, HEIGHT], countries);
-const pathGenerator = geoPath(projection);
+// digits(2) rounds path coordinates to 0.01 of a viewBox unit instead of
+// d3-geo's default 3 — at MAX_SCALE (see WorldMapInteractive), 0.01 unit is
+// ~2.5 screen px, well below what's visible, while cutting the `d` strings'
+// gzipped size by about a fifth. Doesn't touch .bounds()/.centroid() below,
+// which stay full-precision (they're a handful of numbers per country, not
+// worth trading accuracy for).
+const pathGenerator = geoPath(projection).digits(2);
 
 // All the geometry math above runs once at module load, on the server only —
 // the client just receives the plain {id, name, d} list below, never the raw
@@ -33,11 +48,14 @@ const countryPaths: CountryPath[] = countryFeatures.map((country, index) => {
   const rawId = country.id;
   const hasIsoId = rawId !== undefined && rawId !== null;
 
-  // A few disputed territories (Kosovo, N. Cyprus, Somaliland, …) have no
-  // official ISO 3166-1 numeric code and so no `id` in this dataset. Fall
-  // back to a positional id so every feature still gets a stable, unique key
-  // — without this, all of them collapse onto the same "undefined" id.
-  const id = hasIsoId ? String(rawId) : `no-iso-${index}`;
+  // Always suffixed with the feature's index, even when it has a real ISO
+  // id: a few disputed territories (Kosovo, N. Cyprus, Somaliland, …) have
+  // no numeric code at all, but 50m resolution also splits some countries
+  // into multiple features sharing one code (Australia's mainland and
+  // Ashmore & Cartier Is. both carry "036") — either way, without the
+  // index suffix two features collide on the same id, and React logs a
+  // duplicate-key warning and can drop/mix up one of them.
+  const id = hasIsoId ? `${rawId}-${index}` : `no-iso-${index}`;
 
   // world-atlas stores the ISO 3166-1 numeric code without zero-padding
   // guarantees for lookup libraries, so pad it to the standard 3 digits.
