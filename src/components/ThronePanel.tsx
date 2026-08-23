@@ -1,5 +1,6 @@
 "use client";
 
+import { BETA_HOLD_HOURS, PAYMENTS_ENABLED } from "@/lib/beta-mode";
 import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import CountdownTimer from "./CountdownTimer";
 import ReportButton from "./ReportButton";
@@ -15,6 +16,14 @@ interface ThronePanelProps {
 
 function formatMoney(amount: number): string {
   return `$${amount.toLocaleString("en-US")}`;
+}
+
+// A past claim's amount is 0 only when it was made during the free beta
+// (see src/lib/beta-mode.ts / claim_throne_beta) — paid-mode's minimum is
+// always > 0, so this is an unambiguous signal regardless of which mode is
+// active right now.
+function formatPastAmount(amount: number): string {
+  return amount > 0 ? formatMoney(amount) : "Free";
 }
 
 // The "who leads this country, and how to take it over" block — shared by
@@ -55,8 +64,16 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
                 >
                   {throne.brandTitle || `@${throne.handle}`}
                 </a>
-                <span className="text-muted-2">paid</span>
-                <span className="font-mono font-medium text-accent">{formatMoney(throne.currentValue ?? 0)}</span>
+                {PAYMENTS_ENABLED ? (
+                  <>
+                    <span className="text-muted-2">paid</span>
+                    <span className="font-mono font-medium text-accent">{formatMoney(throne.currentValue ?? 0)}</span>
+                  </>
+                ) : (
+                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
+                    Free (beta)
+                  </span>
+                )}
                 <ReportButton throneClaimId={throne.currentClaimId ?? 0} compact />
               </div>
               {throne.postText && (
@@ -79,25 +96,41 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
                 <p className="text-[11px] text-muted-2">Reign ends in</p>
                 <CountdownTimer target={throne.cycleEnd ?? 0} now={now} className="font-mono text-sm text-foreground" />
               </div>
-              <button
-                type="button"
-                onClick={onOpenClaim}
-                className="rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
-              >
-                Take the throne ({formatMoney(requiredMinimum(throne))})
-              </button>
+              {PAYMENTS_ENABLED ? (
+                <button
+                  type="button"
+                  onClick={onOpenClaim}
+                  className="rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
+                >
+                  Take the throne ({formatMoney(requiredMinimum(throne))})
+                </button>
+              ) : (
+                <span
+                  className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-2"
+                  title="No takeovers during the free beta"
+                >
+                  Held up to {BETA_HOLD_HOURS}h
+                </span>
+              )}
             </div>
           </div>
         </>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-2">No leader yet — base price {formatMoney(requiredMinimum(throne))}</p>
+          {PAYMENTS_ENABLED ? (
+            <p className="text-sm text-muted-2">No leader yet — base price {formatMoney(requiredMinimum(throne))}</p>
+          ) : (
+            <p className="text-sm text-muted-2">
+              No leader yet — <s className="text-muted-2">{formatMoney(requiredMinimum(throne))}</s>{" "}
+              <span className="font-medium text-accent">Free during beta</span>
+            </p>
+          )}
           <button
             type="button"
             onClick={onOpenClaim}
             className="rounded-full bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25"
           >
-            Claim this country ({formatMoney(requiredMinimum(throne))})
+            {PAYMENTS_ENABLED ? `Claim this country (${formatMoney(requiredMinimum(throne))})` : "Claim this country — free"}
           </button>
         </div>
       )}
@@ -106,7 +139,7 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
         <div className="flex flex-wrap items-center gap-1.5">
           {visibleHistory.map((past) => (
             <span key={past.id} className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-muted">
-              @{past.handle} · {formatMoney(past.amountPaid)}
+              @{past.handle} · {formatPastAmount(past.amountPaid)}
             </span>
           ))}
           {extraHistory > 0 && <span className="px-1 text-[11px] text-muted-2">History (+{extraHistory})</span>}

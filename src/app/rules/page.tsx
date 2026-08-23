@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { BETA_HOLD_HOURS, BETA_MAX_COUNTRIES_PER_USER, PAYMENTS_ENABLED } from "@/lib/beta-mode";
+
 export const metadata: Metadata = {
   title: "Rules — World Leaders",
   description: "Voting rules, leadership rules, pricing, and refund policy.",
@@ -7,7 +9,11 @@ export const metadata: Metadata = {
 
 // Kept in sync with what's actually implemented (see proje-spesifikasyonu.md
 // and the throne/voting system code) rather than the older 30-min/2x-cap
-// numbers from an earlier draft of the spec.
+// numbers from an earlier draft of the spec. Leadership content branches on
+// PAYMENTS_ENABLED (src/lib/beta-mode.ts): while it's off, the site runs
+// the free beta rules described here, and the paid system below is framed
+// as what's coming later; once it's on, the paid system is simply "how it
+// works" and the beta framing disappears.
 export default function RulesPage() {
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-8 sm:py-12">
@@ -29,24 +35,59 @@ export default function RulesPage() {
             </ul>
           </section>
 
+          {!PAYMENTS_ENABLED && (
+            <section className="flex flex-col gap-2 rounded-xl border border-accent/30 bg-accent/10 p-4">
+              <h2 className="text-base font-semibold text-accent">Leadership is free during the beta</h2>
+              <ul className="list-inside list-disc space-y-1">
+                <li>Claiming a country&apos;s throne costs nothing right now — no payment, no account.</li>
+                <li>A claim holds the country for <strong className="text-foreground">{BETA_HOLD_HOURS} hour</strong>,
+                  starting the moment you claim it. Nobody — including you — can take it over during that hour.</li>
+                <li>When the hour ends, the throne empties and opens back up to anyone.</li>
+                <li>&quot;One person&quot; is your IP address and browser fingerprint together, the same pairing used
+                  for voting. You can lead up to{" "}
+                  <strong className="text-foreground">{BETA_MAX_COUNTRIES_PER_USER} countries</strong> at once —
+                  trying for a sixth is rejected and shows which countries you&apos;re already holding.</li>
+                <li>Everything else about leadership — the required X post, moderation, and history — works exactly
+                  as described below; only the price, duration, and takeover rule are different during the beta.</li>
+                <li>This is temporary. The paid system described in the sections below is what launches once the
+                  beta ends.</li>
+              </ul>
+            </section>
+          )}
+
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold text-foreground">Leadership</h2>
             <ul className="list-inside list-disc space-y-1">
               <li>Claiming a country&apos;s throne requires linking a public X post — it&apos;s shown, along with a
                 brand name, description, and link you provide, on top of that country.</li>
-              <li>A throne lasts <strong className="text-foreground">1 week</strong> from the moment it&apos;s first
-                claimed. Being outbid during that week does not extend or reset it.</li>
+              {PAYMENTS_ENABLED ? (
+                <li>A throne lasts <strong className="text-foreground">1 week</strong> from the moment it&apos;s
+                  first claimed. Being outbid during that week does not extend or reset it.</li>
+              ) : (
+                <li>During the beta, a throne lasts <strong className="text-foreground">{BETA_HOLD_HOURS} hour</strong>{" "}
+                  from the moment it&apos;s claimed, and can&apos;t be taken over while active — see above.</li>
+              )}
               <li>The linked post is snapshotted at claim time and checked periodically — if it&apos;s deleted, hidden,
-                or edited, the content is automatically taken down.</li>
+                or edited, the content is automatically taken down. This runs the same way whether or not payments
+                are on.</li>
               <li>Posts marked sensitive by X, or containing disallowed language, are rejected up front. Anyone can
-                report shown content; reports go to moderation.</li>
+                report shown content; reports go to moderation. These checks are never turned off, beta or not.</li>
               <li>Your handle stays visible in a country&apos;s past-leaders history permanently, even after your
                 reign ends.</li>
             </ul>
           </section>
 
           <section className="flex flex-col gap-2">
-            <h2 className="text-base font-semibold text-foreground">Pricing</h2>
+            <h2 className="text-base font-semibold text-foreground">
+              Pricing{!PAYMENTS_ENABLED && <span className="text-muted-2"> — after the beta</span>}
+            </h2>
+            {!PAYMENTS_ENABLED && (
+              <p className="text-xs text-muted-2">
+                Nothing below is charged right now — leadership is free during the beta (see above). This is the
+                system that takes over once it ends; prices you see elsewhere on the site are shown crossed out
+                until then.
+              </p>
+            )}
             <ul className="list-inside list-disc space-y-1">
               <li>Every country has a base price set by its current monthly voting rank — top 10: $3.00, 11–30:
                 $2.50, 31–70: $2.00, everyone else: $1.50.</li>
@@ -56,20 +97,27 @@ export default function RulesPage() {
                 its current value — you can offer more, there&apos;s no cap.</li>
               <li>Money you&apos;ve put into a country stands as credit: reclaiming it later costs you only the
                 difference. Credit is specific to that country and resets once its throne cycle fully lapses.</li>
-              <li>
-                <strong className="text-foreground">Note:</strong> payments aren&apos;t live yet — claiming currently
-                runs in a free test mode.
-              </li>
+              <li>A throne lasts 1 week from the moment it&apos;s first claimed; being outbid during that week does
+                not extend or reset it.</li>
             </ul>
           </section>
 
           <section className="flex flex-col gap-2">
-            <h2 className="text-base font-semibold text-foreground">Refunds</h2>
-            <ul className="list-inside list-disc space-y-1">
-              <li>There are no refunds. If you&apos;re outbid before your week is up, you don&apos;t get your money
-                back — it stays as credit toward reclaiming the country instead.</li>
-              <li>Content removed for breaking the rules is not refunded.</li>
-            </ul>
+            <h2 className="text-base font-semibold text-foreground">
+              Refunds{!PAYMENTS_ENABLED && <span className="text-muted-2"> — after the beta</span>}
+            </h2>
+            {!PAYMENTS_ENABLED ? (
+              <p>No payments happen during the free beta, so there&apos;s nothing to refund. Once the paid system
+                above launches, the policy is: there are no refunds. If you&apos;re outbid before your week is up,
+                you don&apos;t get your money back — it stays as credit toward reclaiming the country instead.
+                Content removed for breaking the rules is not refunded either, beta or not.</p>
+            ) : (
+              <ul className="list-inside list-disc space-y-1">
+                <li>There are no refunds. If you&apos;re outbid before your week is up, you don&apos;t get your money
+                  back — it stays as credit toward reclaiming the country instead.</li>
+                <li>Content removed for breaking the rules is not refunded.</li>
+              </ul>
+            )}
           </section>
 
           <section className="flex flex-col gap-2">

@@ -35,7 +35,9 @@ function TickerRow({ items, onSelect, hidden }: { items: TickerItem[]; onSelect:
           <span className="font-medium text-foreground">{item.countryName}</span>
           <span className="text-muted-2">·</span>
           <span className="text-muted">@{item.handle}</span>
-          <span className="font-mono font-semibold text-accent">${item.amountPaid.toLocaleString("en-US")}</span>
+          <span className="font-mono font-semibold text-accent">
+            {item.amountPaid > 0 ? `$${item.amountPaid.toLocaleString("en-US")}` : "Free"}
+          </span>
           {!hidden && <ReportButton throneClaimId={item.throneClaimId} compact />}
         </div>
       ))}

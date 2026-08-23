@@ -79,7 +79,13 @@ export default function LeadersList({ thrones }: LeadersListProps) {
                   </a>
                 )}
                 <p className="mt-2 font-mono text-xs text-muted">
-                  Paid <span className="text-accent">{formatMoney(throne.currentValue ?? 0)}</span>
+                  {throne.currentValue ? (
+                    <>
+                      Paid <span className="text-accent">{formatMoney(throne.currentValue)}</span>
+                    </>
+                  ) : (
+                    <span className="text-accent">Free (beta)</span>
+                  )}
                 </p>
               </div>
 

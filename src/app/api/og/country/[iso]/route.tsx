@@ -78,7 +78,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ iso
           </div>
         )}
 
-        <div style={{ display: "flex", marginTop: "auto", fontSize: 28, color: "#6c6c74" }}>worldleaders.lol</div>
+        <div style={{ display: "flex", marginTop: "auto", alignItems: "center", gap: 14 }}>
+          {/* Corner brand mark — same "Coordinate" glyph as the site header
+              (see components/Logo.tsx), redrawn for satori. */}
+          <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+            <path d="M4 12c6-4 18-4 24 0" stroke="#6c6c74" strokeWidth="1.7" strokeLinecap="round" />
+            <path d="M4 21c6 3.6 18 3.6 24 0" stroke="#6c6c74" strokeWidth="1.7" strokeLinecap="round" opacity={0.6} />
+            <path d="M16 4c4.3 5.3 4.3 18.7 0 24" stroke="#6c6c74" strokeWidth="1.7" strokeLinecap="round" opacity={0.55} />
+            <circle cx="22.5" cy="15.5" r="2.3" fill="#f5b301" />
+          </svg>
+          <span style={{ display: "flex", fontSize: 28, color: "#6c6c74" }}>worldleaders.lol</span>
+        </div>
       </div>
     ),
     { width: 1200, height: 630 },

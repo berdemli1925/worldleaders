@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import Logo from "@/components/Logo";
+import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
+
 const LINKS = [
   { href: "/", label: "Rankings" },
   { href: "/leaders", label: "Leaders" },
@@ -19,9 +22,18 @@ export default function SiteNav() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-surface/95 backdrop-blur">
       <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-3">
-        <Link href="/" className="text-sm font-semibold tracking-tight text-foreground">
-          World leaders
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <Logo />
+          {!PAYMENTS_ENABLED && (
+            <Link
+              href="/rules"
+              title="Leadership is free during the beta — see Rules for details"
+              className="rounded-full border border-accent/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/10"
+            >
+              Beta
+            </Link>
+          )}
+        </div>
 
         <nav className="hidden items-center gap-1 sm:flex" aria-label="Main">
           {LINKS.map((link) => {

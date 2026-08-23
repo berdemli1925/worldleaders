@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { getCountryMeta } from "@/lib/country-meta";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { LogoMark } from "@/components/Logo";
 import WorldMap from "@/components/WorldMap";
 
 // With no ?country= param this returns {} and the page inherits the root
@@ -49,7 +50,13 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-8 sm:py-12">
       <main className="flex w-full max-w-4xl flex-col items-center gap-6">
         <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">World leaders</h1>
+          <h1 className="flex items-center gap-3 text-foreground">
+            <LogoMark className="h-9 w-9 shrink-0 sm:h-11 sm:w-11" />
+            <span className="flex items-baseline gap-2 whitespace-nowrap text-3xl uppercase tracking-tight sm:text-4xl">
+              <span className="text-[0.94em] font-normal tracking-[0.02em] text-muted">World</span>
+              <span className="font-bold tracking-[0.005em]">Leaders</span>
+            </span>
+          </h1>
           <p className="max-w-xl text-sm text-muted">
             Vote for your country, watch the ranking shift, and see who&apos;s currently sitting on the throne.
           </p>

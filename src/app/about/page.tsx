@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
+
 export const metadata: Metadata = {
   title: "About — World Leaders",
   description: "What World Leaders is and how it works.",
@@ -37,9 +39,19 @@ export default function AboutPage() {
               the whole site to see.
             </p>
             <p>
-              A throne lasts one week from the moment it&apos;s first claimed. Anyone can outbid the current
-              leader by paying at least $2 more than the throne&apos;s current value, with no upper limit. Full
-              details are on the{" "}
+              {PAYMENTS_ENABLED ? (
+                <>
+                  A throne lasts one week from the moment it&apos;s first claimed. Anyone can outbid the current
+                  leader by paying at least $2 more than the throne&apos;s current value, with no upper limit.
+                </>
+              ) : (
+                <>
+                  Leadership is <strong className="text-foreground">free during the beta</strong> — a claim holds
+                  the country for 1 hour, with no takeovers, and you can lead up to 5 countries at once. This
+                  becomes a paid, week-long, outbiddable throne system once the beta ends.
+                </>
+              )}{" "}
+              Full details are on the{" "}
               <a href="/rules" className="text-accent hover:underline">
                 Rules
               </a>{" "}
@@ -52,7 +64,7 @@ export default function AboutPage() {
             <p>
               It&apos;s a lightweight, global, slightly absurd popularity contest — a live map that reacts to real
               votes and real posts instead of sitting static, with just enough at stake (a real post, a real
-              handle, a real week-long claim) to make holding a country&apos;s throne mean something.
+              handle, a real timed claim) to make holding a country&apos;s throne mean something.
             </p>
           </section>
         </div>

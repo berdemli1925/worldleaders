@@ -118,7 +118,10 @@ export default async function ChampionsPage() {
                             >
                               {row.leader_brand_title || `@${row.leader_x_handle}`}
                             </a>
-                            {row.leader_amount_paid !== null && ` · paid ${formatMoney(row.leader_amount_paid)}`}
+                            {row.leader_amount_paid !== null &&
+                              (row.leader_amount_paid > 0
+                                ? ` · paid ${formatMoney(row.leader_amount_paid)}`
+                                : " · free (beta)")}
                           </>
                         ) : (
                           "No leader at the time"
