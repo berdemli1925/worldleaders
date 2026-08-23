@@ -13,7 +13,7 @@ export default async function LeadersPage() {
   const { data, error } = await supabaseAdmin
     .from("thrones_with_leader")
     .select(
-      "country_iso_code, base_price, current_value, current_claim_id, cycle_start, cycle_end, x_handle, amount_paid, post_text, post_author_name, post_author_avatar_url, post_image_url, post_created_at, brand_title, description, link_url, logo_url, claimed_at",
+      "country_iso_code, base_price, current_value, current_claim_id, cycle_start, cycle_end, x_handle, amount_paid, post_text, post_author_name, post_author_avatar_url, post_image_url, post_created_at, brand_title, description, link_url, logo_url, claimed_at, post_image_width, post_image_height, post_image_scale, post_image_offset_x, post_image_offset_y, leader_x_url, leader_instagram_url, leader_tiktok_url, leader_facebook_url",
     )
     .not("current_value", "is", null)
     .order("current_value", { ascending: false });

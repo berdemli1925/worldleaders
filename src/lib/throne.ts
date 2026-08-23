@@ -23,6 +23,18 @@ export interface ThroneEntry {
   linkUrl: string | null;
   logoUrl: string | null;
   claimedAt: number | null;
+  /** Natural pixel size of postImageUrl, captured client-side at claim time. Null for claims made before image cropping existed. */
+  postImageWidth: number | null;
+  postImageHeight: number | null;
+  /** See src/lib/image-crop.ts — null (not just missing) means "use the default crop." */
+  postImageScale: number | null;
+  postImageOffsetX: number | null;
+  postImageOffsetY: number | null;
+  /** Who's actually leading — separate from the X post above, which can be any public post. See src/lib/social-links.ts. At least one is non-null on any real claim. */
+  leaderXUrl: string | null;
+  leaderInstagramUrl: string | null;
+  leaderTiktokUrl: string | null;
+  leaderFacebookUrl: string | null;
 }
 
 export interface ThroneClaimHistoryEntry {
@@ -57,6 +69,15 @@ export interface ThroneRow {
   link_url: string | null;
   logo_url: string | null;
   claimed_at: string | null;
+  post_image_width: number | null;
+  post_image_height: number | null;
+  post_image_scale: number | null;
+  post_image_offset_x: number | null;
+  post_image_offset_y: number | null;
+  leader_x_url: string | null;
+  leader_instagram_url: string | null;
+  leader_tiktok_url: string | null;
+  leader_facebook_url: string | null;
 }
 
 export function mapThroneRow(row: ThroneRow): ThroneEntry {
@@ -79,6 +100,15 @@ export function mapThroneRow(row: ThroneRow): ThroneEntry {
     linkUrl: row.link_url,
     logoUrl: row.logo_url,
     claimedAt: row.claimed_at ? new Date(row.claimed_at).getTime() : null,
+    postImageWidth: row.post_image_width,
+    postImageHeight: row.post_image_height,
+    postImageScale: row.post_image_scale,
+    postImageOffsetX: row.post_image_offset_x,
+    postImageOffsetY: row.post_image_offset_y,
+    leaderXUrl: row.leader_x_url,
+    leaderInstagramUrl: row.leader_instagram_url,
+    leaderTiktokUrl: row.leader_tiktok_url,
+    leaderFacebookUrl: row.leader_facebook_url,
   };
 }
 

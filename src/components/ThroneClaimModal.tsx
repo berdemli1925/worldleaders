@@ -5,12 +5,19 @@ import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { BETA_HOLD_HOURS, BETA_MAX_COUNTRIES_PER_USER, PAYMENTS_ENABLED } from "@/lib/beta-mode";
 import { getFingerprint } from "@/lib/fingerprint";
+import { DEFAULT_IMAGE_CROP, type ImageCropTransform, type Size } from "@/lib/image-crop";
+import { parseSocialUrl, SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/social-links";
 import { isVacant, requiredMinimum, type ThroneEntry } from "@/lib/throne";
+import ImagePositioner from "./ImagePositioner";
+import SocialPlatformIcon from "./SocialPlatformIcon";
 
 interface ThroneClaimModalProps {
   isoCode: string;
   countryName: string;
   throne: ThroneEntry | undefined;
+  /** The country's own outline + bounding box — same data WorldMap.tsx computes for the map itself, threaded down so the image positioner clips to the exact same shape (see WorldMapInteractive.tsx / Leaderboard.tsx for where this comes from). Undefined for the handful of territories with no map geometry (see WorldMap.tsx's 50m comment) — the positioner just doesn't appear for those. */
+  countryPathD?: string;
+  countryBounds?: [number, number, number, number];
   onClose: () => void;
   onClaimed: () => void;
 }
@@ -20,7 +27,8 @@ interface PreviewSnapshot {
   authorName: string;
   authorHandle: string;
   authorAvatarUrl: string;
-  imageUrl: string | null;
+  /** Every photo on the post, highest-resolution — see src/lib/x-post.ts. Empty (not null) when the post has no photos. */
+  imageUrls: string[];
 }
 
 function formatMoney(amount: number): string {
@@ -39,7 +47,15 @@ function formatMoney(amount: number): string {
 // response, which is what makes "Preview yapılmadan ödeme aktif olmaz"
 // true here in both modes; the actual integrity guarantee is server-side
 // (/api/throne/claim re-fetches and re-checks everything independently).
-export default function ThroneClaimModal({ isoCode, countryName, throne, onClose, onClaimed }: ThroneClaimModalProps) {
+export default function ThroneClaimModal({
+  isoCode,
+  countryName,
+  throne,
+  countryPathD,
+  countryBounds,
+  onClose,
+  onClaimed,
+}: ThroneClaimModalProps) {
   const minimum = requiredMinimum(throne);
   // In beta mode a claim modal should only ever be opened for a vacant
   // country (see ThronePanel — occupied countries show no claim button
@@ -47,10 +63,26 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
   // the reason and nothing else rather than let a doomed submit happen.
   const betaBlocked = !PAYMENTS_ENABLED && !isVacant(throne);
 
+  // Leader identity — who's claiming — kept entirely separate from the X
+  // post below, which is just content and doesn't have to be this
+  // person's own post. See src/lib/social-links.ts.
+  const [leaderXUrl, setLeaderXUrl] = useState("");
+  const [leaderInstagramUrl, setLeaderInstagramUrl] = useState("");
+  const [leaderTiktokUrl, setLeaderTiktokUrl] = useState("");
+  const [leaderFacebookUrl, setLeaderFacebookUrl] = useState("");
+  const leaderFields: { platform: SocialPlatform; value: string; setValue: (value: string) => void }[] = [
+    { platform: "x", value: leaderXUrl, setValue: setLeaderXUrl },
+    { platform: "instagram", value: leaderInstagramUrl, setValue: setLeaderInstagramUrl },
+    { platform: "tiktok", value: leaderTiktokUrl, setValue: setLeaderTiktokUrl },
+    { platform: "facebook", value: leaderFacebookUrl, setValue: setLeaderFacebookUrl },
+  ];
+  const filledLeaderFields = leaderFields.filter((field) => field.value.trim());
+  const invalidLeaderFields = filledLeaderFields.filter((field) => !parseSocialUrl(field.platform, field.value.trim()));
+  const leaderIdentityValid = filledLeaderFields.length > 0 && invalidLeaderFields.length === 0;
+
   const [tweetUrl, setTweetUrl] = useState("");
   const [brandTitle, setBrandTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [linkUrl, setLinkUrl] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
 
   const [previewStatus, setPreviewStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
@@ -60,6 +92,10 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
   // current fields below (contentKey) so an edit after previewing
   // invalidates it, computed during render rather than via an effect.
   const [previewedFor, setPreviewedFor] = useState<string | null>(null);
+
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [imageCrop, setImageCrop] = useState<ImageCropTransform>(DEFAULT_IMAGE_CROP);
+  const [imageNaturalSize, setImageNaturalSize] = useState<Size | null>(null);
 
   const [offeredAmount, setOfferedAmount] = useState(() => minimum.toFixed(2));
   const [acceptedRules, setAcceptedRules] = useState(false);
@@ -98,6 +134,11 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
       setPreview(data.snapshot);
       setPreviewedFor(contentKey);
       setPreviewStatus("ok");
+      // New post, new set of photos — any positioning done for a previous
+      // preview no longer applies.
+      setSelectedImageIndex(0);
+      setImageCrop(DEFAULT_IMAGE_CROP);
+      setImageNaturalSize(null);
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : "Preview failed.");
       setPreviewStatus("error");
@@ -115,6 +156,7 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
         throw new Error(`Offer must be at least ${formatMoney(minimum)}.`);
       }
       const fingerprint = PAYMENTS_ENABLED ? undefined : await getFingerprint();
+      const chosenImageUrl = preview?.imageUrls[selectedImageIndex];
       const res = await fetch("/api/throne/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,8 +167,20 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
           fingerprint,
           brandTitle: brandTitle || undefined,
           description: description || undefined,
-          linkUrl: linkUrl || undefined,
           logoUrl: logoUrl || undefined,
+          leaderXUrl: leaderXUrl.trim() || undefined,
+          leaderInstagramUrl: leaderInstagramUrl.trim() || undefined,
+          leaderTiktokUrl: leaderTiktokUrl.trim() || undefined,
+          leaderFacebookUrl: leaderFacebookUrl.trim() || undefined,
+          // Only meaningful (and only sent) when the post actually has a
+          // photo and it's finished loading — the server re-validates this
+          // against its own fetch of the post regardless.
+          imageUrl: chosenImageUrl && imageNaturalSize ? chosenImageUrl : undefined,
+          imageWidth: imageNaturalSize?.width,
+          imageHeight: imageNaturalSize?.height,
+          imageScale: imageNaturalSize ? imageCrop.scale : undefined,
+          imageOffsetX: imageNaturalSize ? imageCrop.offsetX : undefined,
+          imageOffsetY: imageNaturalSize ? imageCrop.offsetY : undefined,
         }),
       });
       const data = await res.json();
@@ -156,7 +210,7 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
     }
   }
 
-  const canOffer = previewIsCurrent;
+  const canSubmit = previewIsCurrent && leaderIdentityValid;
   const offered = Number(offeredAmount) || minimum;
 
   return (
@@ -212,11 +266,49 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
             </p>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-              {/* Content + Preview */}
+              {/* Leader identity — who's claiming, entirely separate from
+                  the X post below. At least one platform is required; each
+                  filled-in one is validated as a real profile URL for that
+                  platform (not a post link, not another platform's URL). */}
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium text-foreground">Your identity</p>
+                <p className="text-xs text-muted-2">
+                  Link at least one profile of yours — this is who&apos;s shown as the leader.
+                </p>
+                {leaderFields.map((field) => {
+                  const trimmed = field.value.trim();
+                  const invalid = trimmed !== "" && !parseSocialUrl(field.platform, trimmed);
+                  const def = SOCIAL_PLATFORMS.find((p) => p.platform === field.platform);
+                  return (
+                    <label key={field.platform} className="flex flex-col gap-1 text-sm">
+                      <span className="flex items-center gap-1.5 text-muted">
+                        <SocialPlatformIcon platform={field.platform} className="h-3.5 w-3.5" />
+                        {def?.label}
+                      </span>
+                      <input
+                        type="text"
+                        value={field.value}
+                        onChange={(event) => field.setValue(event.target.value)}
+                        placeholder={def?.placeholder}
+                        className={`rounded-full border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent ${
+                          invalid ? "border-danger" : "border-border"
+                        }`}
+                      />
+                      {invalid && <span className="text-xs text-danger">Not a {def?.label} profile URL.</span>}
+                    </label>
+                  );
+                })}
+                {filledLeaderFields.length === 0 && (
+                  <p className="text-xs text-muted-2">At least one is required.</p>
+                )}
+              </div>
+
+              {/* Content + Preview — any public X post, doesn't have to be
+                  the leader's own. */}
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-medium text-foreground">Content</p>
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-muted">Your X post URL — required</span>
+                  <span className="text-muted">X post to display — required, any public post</span>
                   <input
                     type="text"
                     required
@@ -242,15 +334,6 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
                     onChange={(event) => setDescription(event.target.value)}
                     rows={2}
                     className="resize-none rounded-xl border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-muted">Website / X / Instagram link (optional)</span>
-                  <input
-                    type="text"
-                    value={linkUrl}
-                    onChange={(event) => setLinkUrl(event.target.value)}
-                    className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
@@ -285,12 +368,48 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
                     </div>
                   </div>
                 )}
+
+                {/* Image positioning — only when the post actually has a
+                    photo (a post with just text/a quote/a link has nothing
+                    to crop, so the tool simply doesn't appear). */}
+                {previewIsCurrent && preview && preview.imageUrls.length > 0 && countryPathD && countryBounds && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium text-foreground">Position on the map</p>
+                    {preview.imageUrls.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {preview.imageUrls.map((url, index) => (
+                          <button
+                            key={url}
+                            type="button"
+                            onClick={() => setSelectedImageIndex(index)}
+                            aria-label={`Use photo ${index + 1}`}
+                            aria-pressed={selectedImageIndex === index}
+                            className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 ${
+                              selectedImageIndex === index ? "border-accent" : "border-transparent opacity-60 hover:opacity-100"
+                            }`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt="" className="h-full w-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <ImagePositioner
+                      imageUrl={preview.imageUrls[selectedImageIndex]}
+                      countryPathD={countryPathD}
+                      countryBounds={countryBounds}
+                      value={imageCrop}
+                      onChange={setImageCrop}
+                      onNaturalSize={setImageNaturalSize}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Offer — paid mode only; beta claims are free (see the
                   banner above), so there's nothing to bid. */}
               {PAYMENTS_ENABLED && (
-                <div className={`flex flex-col gap-2 ${canOffer ? "" : "pointer-events-none opacity-40"}`}>
+                <div className={`flex flex-col gap-2 ${canSubmit ? "" : "pointer-events-none opacity-40"}`}>
                   <p className="text-sm font-medium text-foreground">Offer</p>
                   <div className="flex flex-wrap gap-1.5">
                     {[minimum, minimum + 2, minimum + 5].map((amount, index) => (
@@ -349,7 +468,7 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
 
               {/* Confirm */}
               <label
-                className={`flex items-start gap-2 text-xs text-muted ${canOffer ? "" : "pointer-events-none opacity-40"}`}
+                className={`flex items-start gap-2 text-xs text-muted ${canSubmit ? "" : "pointer-events-none opacity-40"}`}
               >
                 <input
                   type="checkbox"
@@ -376,7 +495,7 @@ export default function ThroneClaimModal({ isoCode, countryName, throne, onClose
 
               <button
                 type="submit"
-                disabled={!canOffer || !acceptedRules || submitting}
+                disabled={!canSubmit || !acceptedRules || submitting}
                 className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
               >
                 {submitting ? "Claiming…" : PAYMENTS_ENABLED ? `Claim for ${formatMoney(offered)}` : "Claim for free"}

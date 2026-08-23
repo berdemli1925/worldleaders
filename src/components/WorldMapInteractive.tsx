@@ -2,6 +2,8 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
+import { buildCountryByAlpha2 } from "@/lib/country-path";
+import { computeImageRect, DEFAULT_IMAGE_CROP } from "@/lib/image-crop";
 import { twitterImageVariant } from "@/lib/twitter-image";
 import { voteCountToColor } from "@/lib/vote-color-scale";
 import type { ThroneClaimHistoryEntry, ThroneEntry } from "@/lib/throne";
@@ -165,28 +167,9 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
   const [jumping, setJumping] = useState(false);
 
   const countryById = useMemo(() => new Map(countries.map((country) => [country.id, country])), [countries]);
-  // A handful of countries are split into multiple features at 50m
-  // resolution — e.g. Australia's mainland and the tiny, separately-listed
-  // Ashmore & Cartier Is. both resolve to alpha2 "AU" (see WorldMap.tsx).
-  // Keep the one with the larger bounding box so focusCountry zooms to the
-  // country itself, not to whichever piece happened to come last.
-  const countryByAlpha2 = useMemo(() => {
-    const map = new Map<string, CountryPath>();
-    for (const country of countries) {
-      if (!country.alpha2) continue;
-      const existing = map.get(country.alpha2);
-      if (!existing) {
-        map.set(country.alpha2, country);
-        continue;
-      }
-      const [ex0, ey0, ex1, ey1] = existing.bounds;
-      const [x0, y0, x1, y1] = country.bounds;
-      if ((x1 - x0) * (y1 - y0) > (ex1 - ex0) * (ey1 - ey0)) {
-        map.set(country.alpha2, country);
-      }
-    }
-    return map;
-  }, [countries]);
+  // Used by focusCountry below — see src/lib/country-path.ts for why this
+  // needs a tie-break, not just a plain by-alpha2 map.
+  const countryByAlpha2 = useMemo(() => buildCountryByAlpha2(countries), [countries]);
   const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
 
   // Which leadered countries get the full clipped post image vs. the small
@@ -199,7 +182,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
   // already nulls every leader field site-wide when hidden, so throneByIso
   // simply has nothing to show for any country in that case.
   const leaderLayers = useMemo(() => {
-    const images: { country: CountryPath; imageUrl: string }[] = [];
+    const images: { country: CountryPath; imageUrl: string; throne: ThroneEntry }[] = [];
     const avatars: { country: CountryPath; avatarUrl: string }[] = [];
 
     for (const country of countries) {
@@ -215,7 +198,10 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
       if (!onScreen) continue;
 
       if (throne.postImageUrl && screenX1 - screenX0 >= IMAGE_MIN_SCREEN_PX && screenY1 - screenY0 >= IMAGE_MIN_SCREEN_PX) {
-        images.push({ country, imageUrl: twitterImageVariant(throne.postImageUrl, "240x240") });
+        // "orig" — up from a fixed small variant — now that MAX_SCALE lets a
+        // claimed country fill most of the screen, anything less looks
+        // visibly soft at that size. See src/lib/twitter-image.ts.
+        images.push({ country, imageUrl: twitterImageVariant(throne.postImageUrl, "orig"), throne });
       } else if (throne.postAuthorAvatarUrl) {
         avatars.push({ country, avatarUrl: throne.postAuthorAvatarUrl });
       }
@@ -542,20 +528,38 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                     ))}
                   </defs>
 
-                  {leaderLayers.images.map(({ country, imageUrl }) => {
+                  {leaderLayers.images.map(({ country, imageUrl, throne }) => {
                     const [x0, y0, x1, y1] = country.bounds;
+                    const boxWidth = x1 - x0;
+                    const boxHeight = y1 - y0;
+                    // The claimer's chosen crop (ImagePositioner) when we
+                    // know the image's natural size — same computeImageRect
+                    // call the positioner itself used, so this is pixel-
+                    // identical to what they previewed. Falls back to plain
+                    // preserveAspectRatio cover-fit for claims made before
+                    // image cropping existed (no stored width/height).
+                    const rect =
+                      throne.postImageWidth && throne.postImageHeight
+                        ? computeImageRect(
+                            { width: boxWidth, height: boxHeight },
+                            { width: throne.postImageWidth, height: throne.postImageHeight },
+                            throne.postImageScale !== null && throne.postImageOffsetX !== null && throne.postImageOffsetY !== null
+                              ? { scale: throne.postImageScale, offsetX: throne.postImageOffsetX, offsetY: throne.postImageOffsetY }
+                              : DEFAULT_IMAGE_CROP,
+                          )
+                        : null;
                     return (
                       <g key={country.id} pointerEvents="none" clipPath={`url(#clip-img-${country.id})`}>
                         <image
                           href={imageUrl}
-                          x={x0}
-                          y={y0}
-                          width={x1 - x0}
-                          height={y1 - y0}
-                          preserveAspectRatio="xMidYMid slice"
+                          x={rect ? x0 + rect.x : x0}
+                          y={rect ? y0 + rect.y : y0}
+                          width={rect ? rect.width : boxWidth}
+                          height={rect ? rect.height : boxHeight}
+                          preserveAspectRatio={rect ? "none" : "xMidYMid slice"}
                         />
                         {/* Light darkening so the (redrawn, on-top) border and hover tooltip name stay readable. */}
-                        <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill="black" fillOpacity={0.35} />
+                        <rect x={x0} y={y0} width={boxWidth} height={boxHeight} fill="black" fillOpacity={0.35} />
                       </g>
                     );
                   })}
@@ -684,6 +688,8 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
           isoCode={voteIsoCode}
           countryName={selectedCountry.name}
           throne={throneByIso.get(voteIsoCode)}
+          countryPathD={selectedCountry.d}
+          countryBounds={selectedCountry.bounds}
           onClose={() => setClaimModalOpen(false)}
           onClaimed={onThroneClaimed}
         />

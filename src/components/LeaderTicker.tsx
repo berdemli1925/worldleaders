@@ -1,10 +1,14 @@
 import Flag from "./Flag";
+import LeaderIdentityBadges from "./LeaderIdentityBadges";
 import ReportButton from "./ReportButton";
 
 export interface TickerItem {
   isoCode: string;
   countryName: string;
-  handle: string;
+  leaderXUrl: string | null;
+  leaderInstagramUrl: string | null;
+  leaderTiktokUrl: string | null;
+  leaderFacebookUrl: string | null;
   amountPaid: number;
   throneClaimId: number;
 }
@@ -34,7 +38,13 @@ function TickerRow({ items, onSelect, hidden }: { items: TickerItem[]; onSelect:
           <Flag alpha2={item.isoCode} width={18} />
           <span className="font-medium text-foreground">{item.countryName}</span>
           <span className="text-muted-2">·</span>
-          <span className="text-muted">@{item.handle}</span>
+          <LeaderIdentityBadges
+            xUrl={item.leaderXUrl}
+            instagramUrl={item.leaderInstagramUrl}
+            tiktokUrl={item.leaderTiktokUrl}
+            facebookUrl={item.leaderFacebookUrl}
+            compact
+          />
           <span className="font-mono font-semibold text-accent">
             {item.amountPaid > 0 ? `$${item.amountPaid.toLocaleString("en-US")}` : "Free"}
           </span>

@@ -3,6 +3,8 @@
 import { BETA_HOLD_HOURS, PAYMENTS_ENABLED } from "@/lib/beta-mode";
 import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import CountdownTimer from "./CountdownTimer";
+import CroppedLeaderImage from "./CroppedLeaderImage";
+import LeaderIdentityBadges from "./LeaderIdentityBadges";
 import ReportButton from "./ReportButton";
 
 interface ThronePanelProps {
@@ -41,29 +43,33 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
       {hasLeader && throne ? (
         <>
           {throne.postImageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={throne.postImageUrl}
-              alt=""
-              className="w-full rounded-xl object-cover"
-              style={{ maxHeight: 320 }}
+            <CroppedLeaderImage
+              imageUrl={throne.postImageUrl}
+              imageWidth={throne.postImageWidth}
+              imageHeight={throne.postImageHeight}
+              scale={throne.postImageScale}
+              offsetX={throne.postImageOffsetX}
+              offsetY={throne.postImageOffsetY}
+              className="h-56 w-full rounded-xl"
             />
           )}
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              {/* Leader — who's claiming, kept visually separate from the
+                  post content below since they can be different people
+                  (see LeaderIdentityBadges.tsx). */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                 {throne.logoUrl && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={throne.logoUrl} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
                 )}
-                <a
-                  href={`https://x.com/${throne.handle}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-foreground hover:text-accent"
-                >
-                  {throne.brandTitle || `@${throne.handle}`}
-                </a>
+                <LeaderIdentityBadges
+                  xUrl={throne.leaderXUrl}
+                  instagramUrl={throne.leaderInstagramUrl}
+                  tiktokUrl={throne.leaderTiktokUrl}
+                  facebookUrl={throne.leaderFacebookUrl}
+                  brandTitle={throne.brandTitle}
+                />
                 {PAYMENTS_ENABLED ? (
                   <>
                     <span className="text-muted-2">paid</span>
@@ -76,11 +82,23 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
                 )}
                 <ReportButton throneClaimId={throne.currentClaimId ?? 0} compact />
               </div>
+              {/* Content — the linked X post, shown separately since it
+                  isn't necessarily the leader's own post. */}
               {throne.postText && (
-                <p className="border-l-2 border-border pl-2 text-xs italic text-muted">&ldquo;{throne.postText}&rdquo;</p>
+                <div className="flex flex-col gap-0.5">
+                  <a
+                    href={`https://x.com/${throne.handle}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-muted-2 hover:text-accent"
+                  >
+                    Post shown via @{throne.handle} on X
+                  </a>
+                  <p className="border-l-2 border-border pl-2 text-xs italic text-muted">&ldquo;{throne.postText}&rdquo;</p>
+                </div>
               )}
               {throne.description && <p className="text-xs text-muted">{throne.description}</p>}
-              {throne.linkUrl && (
+              {!throne.leaderXUrl && !throne.leaderInstagramUrl && !throne.leaderTiktokUrl && !throne.leaderFacebookUrl && throne.linkUrl && (
                 <a
                   href={throne.linkUrl}
                   target="_blank"

@@ -1,3 +1,5 @@
+import { twitterImageVariant } from "./twitter-image";
+
 // Fetches an X/Twitter post's data without authentication, via the same
 // unofficial-but-stable syndication endpoint X's own embed widget script
 // uses. Server-only: never call this from a "use client" file. Used by
@@ -43,8 +45,16 @@ export interface TweetSnapshot {
   authorName: string;
   authorHandle: string;
   authorAvatarUrl: string;
-  /** First photo/video-poster image, if the post has media — null otherwise. */
+  /** First entry of imageUrls, or null — kept for callers that only ever
+   *  wanted "the" image (OG cards, etc.); the throne claim flow itself
+   *  uses imageUrls so the poster can pick which one to use. */
   imageUrl: string | null;
+  /** Every still photo on the post, highest-resolution CDN variant
+   *  (`?name=orig`), in the order X returned them. Deliberately excludes
+   *  videos/GIFs — there's no single frame to crop a country's silhouette
+   *  to — and is empty (not null) when the post has no photos, so callers
+   *  can just check `.length`. */
+  imageUrls: string[];
   createdAt: string;
   /** X's own sensitive-media flag — confirmed present in the syndication payload during testing. */
   possiblySensitive: boolean;
@@ -84,7 +94,17 @@ export async function fetchTweetSnapshot(tweetUrl: string): Promise<TweetSnapsho
     return { ok: false, reason: "Couldn't parse X's response." };
   }
 
-  const imageUrl = data.photos?.[0]?.url ?? data.mediaDetails?.[0]?.media_url_https ?? null;
+  // `photos` covers the common case; `mediaDetails` is the fallback for
+  // posts where `photos` came back empty but media is present — filtered to
+  // type "photo" only, since videos/GIFs show up there too and have no
+  // single frame to use. Deduped (the two arrays can overlap) and requested
+  // at the CDN's highest-resolution variant for the positioning tool and
+  // the map to actually have something worth zooming into.
+  const rawUrls = [
+    ...(data.photos?.map((photo) => photo.url) ?? []),
+    ...(data.mediaDetails?.filter((media) => media.type === "photo").map((media) => media.media_url_https) ?? []),
+  ];
+  const imageUrls = [...new Set(rawUrls)].map((url) => twitterImageVariant(url, "orig"));
 
   return {
     ok: true,
@@ -94,7 +114,8 @@ export async function fetchTweetSnapshot(tweetUrl: string): Promise<TweetSnapsho
     authorName: data.user.name,
     authorHandle: data.user.screen_name,
     authorAvatarUrl: data.user.profile_image_url_https,
-    imageUrl,
+    imageUrl: imageUrls[0] ?? null,
+    imageUrls,
     createdAt: data.created_at,
     possiblySensitive: data.possibly_sensitive === true,
   };

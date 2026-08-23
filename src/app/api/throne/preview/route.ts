@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       authorName: snapshot.authorName,
       authorHandle: snapshot.authorHandle,
       authorAvatarUrl: snapshot.authorAvatarUrl,
-      imageUrl: snapshot.imageUrl,
+      imageUrls: snapshot.imageUrls,
       createdAt: snapshot.createdAt,
     },
   });

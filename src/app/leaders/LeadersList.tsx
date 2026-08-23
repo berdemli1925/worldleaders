@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 
 import CountdownTimer from "@/components/CountdownTimer";
+import CroppedLeaderImage from "@/components/CroppedLeaderImage";
 import Flag from "@/components/Flag";
+import LeaderIdentityBadges from "@/components/LeaderIdentityBadges";
 import { getCountryMeta } from "@/lib/country-meta";
 import type { ThroneEntry } from "@/lib/throne";
 
@@ -46,29 +48,43 @@ export default function LeadersList({ thrones }: LeadersListProps) {
                 <Flag alpha2={throne.isoCode} width={32} />
                 <div className="min-w-0">
                   <p className="truncate font-medium text-foreground">{meta?.name ?? throne.isoCode}</p>
-                  <a
-                    href={`https://x.com/${throne.handle}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="truncate text-xs text-muted hover:text-accent"
-                  >
-                    {throne.brandTitle || `@${throne.handle}`}
-                  </a>
+                  <LeaderIdentityBadges
+                    xUrl={throne.leaderXUrl}
+                    instagramUrl={throne.leaderInstagramUrl}
+                    tiktokUrl={throne.leaderTiktokUrl}
+                    facebookUrl={throne.leaderFacebookUrl}
+                    brandTitle={throne.brandTitle}
+                    compact
+                    className="text-xs"
+                  />
                 </div>
               </div>
 
               {throne.postImageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={throne.postImageUrl}
-                  alt=""
-                  className="h-32 w-full shrink-0 rounded-xl object-cover sm:h-20 sm:w-32"
+                <CroppedLeaderImage
+                  imageUrl={throne.postImageUrl}
+                  imageWidth={throne.postImageWidth}
+                  imageHeight={throne.postImageHeight}
+                  scale={throne.postImageScale}
+                  offsetX={throne.postImageOffsetX}
+                  offsetY={throne.postImageOffsetY}
+                  className="h-32 w-full shrink-0 rounded-xl sm:h-20 sm:w-32"
                 />
               )}
 
               <div className="min-w-0 flex-1">
+                {throne.postText && (
+                  <a
+                    href={`https://x.com/${throne.handle}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block truncate text-[11px] text-muted-2 hover:text-accent"
+                  >
+                    Post shown via @{throne.handle} on X
+                  </a>
+                )}
                 {throne.description && <p className="text-sm text-muted">{throne.description}</p>}
-                {throne.linkUrl && (
+                {!throne.leaderXUrl && !throne.leaderInstagramUrl && !throne.leaderTiktokUrl && !throne.leaderFacebookUrl && throne.linkUrl && (
                   <a
                     href={throne.linkUrl}
                     target="_blank"

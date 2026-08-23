@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 
+import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
 import { isVacant, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import Flag from "./Flag";
 import ThroneClaimModal from "./ThroneClaimModal";
 import ThronePanel from "./ThronePanel";
+import type { CountryPath } from "./WorldMapInteractive";
 
 export interface LeaderboardEntry {
   isoCode: string;
@@ -17,6 +19,8 @@ export interface LeaderboardEntry {
 }
 
 interface LeaderboardProps {
+  /** Same per-country path/bounds data the map uses — only needed here so a claim's image positioner can clip to the country's real shape (see WorldMap.tsx). */
+  countries: CountryPath[];
   entries: LeaderboardEntry[];
   allTimeEntries: LeaderboardEntry[];
   totalVotes: number;
@@ -56,6 +60,7 @@ const PERIODS: [Period, string][] = [
 ];
 
 export default function Leaderboard({
+  countries,
   entries,
   allTimeEntries,
   totalVotes,
@@ -94,6 +99,10 @@ export default function Leaderboard({
   }
 
   const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
+
+  // Only needed so a claim's image positioner can clip to the country's
+  // real shape — see src/lib/country-path.ts.
+  const countryByAlpha2 = useMemo(() => buildCountryByAlpha2(countries), [countries]);
 
   const activeEntries = period === "month" ? entries : allTimeEntries;
   // `totalVotes` from the parent is already this-month's sum (it also drives
@@ -331,6 +340,8 @@ export default function Leaderboard({
                         isoCode={entry.isoCode}
                         countryName={entry.name}
                         throne={throne}
+                        countryPathD={countryByAlpha2.get(entry.isoCode)?.d}
+                        countryBounds={countryByAlpha2.get(entry.isoCode)?.bounds}
                         onClose={() => setOpenClaimIso(null)}
                         onClaimed={onThroneClaimed}
                       />
