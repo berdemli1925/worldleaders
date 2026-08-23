@@ -80,12 +80,13 @@ const RESERVED_HANDLES = new Set([
   "following",
 ]);
 
-/** Validates `url` against `platform`'s profile-URL shape and returns the handle, or null if it doesn't match. */
+/** Validates `url` against `platform`'s profile-URL shape and returns the handle, or null if it doesn't match. A missing scheme (e.g. "x.com/user") is treated as https, same as typing it into a browser's address bar. */
 export function parseSocialUrl(platform: SocialPlatform, url: string): string | null {
   const def = PLATFORM_DEFS[platform];
+  const withScheme = /^https?:\/\//i.test(url) ? url : `https://${url}`;
   let parsed: URL;
   try {
-    parsed = new URL(url);
+    parsed = new URL(withScheme);
   } catch {
     return null;
   }
@@ -95,6 +96,18 @@ export function parseSocialUrl(platform: SocialPlatform, url: string): string | 
   const handle = match[1];
   if (RESERVED_HANDLES.has(handle.toLowerCase())) return null;
   return handle;
+}
+
+/**
+ * Same validation as parseSocialUrl, but returns the absolute (https://…)
+ * URL instead of just the handle — this is what should actually get
+ * stored/linked, since a schemeless value like "x.com/user" saved as-is
+ * would render as a broken relative link (`<a href="x.com/user">` resolves
+ * against the current page, not as https://x.com/user).
+ */
+export function normalizeSocialUrl(platform: SocialPlatform, url: string): string | null {
+  if (!parseSocialUrl(platform, url)) return null;
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
 }
 
 export function platformLabel(platform: SocialPlatform): string {

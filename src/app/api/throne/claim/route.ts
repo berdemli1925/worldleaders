@@ -5,7 +5,7 @@ import { BETA_MAX_COUNTRIES_PER_USER, PAYMENTS_ENABLED } from "@/lib/beta-mode";
 import { getClientIp } from "@/lib/get-client-ip";
 import { MAX_IMAGE_CROP_SCALE } from "@/lib/image-crop";
 import { getPaymentProvider } from "@/lib/payments";
-import { parseSocialUrl } from "@/lib/social-links";
+import { normalizeSocialUrl } from "@/lib/social-links";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchTweetSnapshot } from "@/lib/x-post";
 
@@ -84,10 +84,17 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
+  // Normalized (always absolute — https://…) versions are what actually
+  // get stored/linked; a schemeless value like "x.com/user" saved as-is
+  // would render as a broken relative link. See normalizeSocialUrl.
+  const leaderUrls: Record<keyof typeof rawLeaderUrls, string | null> = { x: null, instagram: null, tiktok: null, facebook: null };
   for (const [platform, url] of Object.entries(rawLeaderUrls)) {
-    if (url && !parseSocialUrl(platform as keyof typeof rawLeaderUrls, url)) {
+    if (!url) continue;
+    const normalized = normalizeSocialUrl(platform as keyof typeof rawLeaderUrls, url);
+    if (!normalized) {
       return NextResponse.json({ error: `That doesn't look like a ${platform} profile URL.` }, { status: 400 });
     }
+    leaderUrls[platform as keyof typeof rawLeaderUrls] = normalized;
   }
 
   // Always re-fetch server-side — never trust a snapshot the client claims
@@ -172,10 +179,10 @@ export async function POST(request: NextRequest) {
       p_post_image_scale: hasImage ? imageScale : null,
       p_post_image_offset_x: hasImage ? imageOffsetX : null,
       p_post_image_offset_y: hasImage ? imageOffsetY : null,
-      p_leader_x_url: rawLeaderUrls.x,
-      p_leader_instagram_url: rawLeaderUrls.instagram,
-      p_leader_tiktok_url: rawLeaderUrls.tiktok,
-      p_leader_facebook_url: rawLeaderUrls.facebook,
+      p_leader_x_url: leaderUrls.x,
+      p_leader_instagram_url: leaderUrls.instagram,
+      p_leader_tiktok_url: leaderUrls.tiktok,
+      p_leader_facebook_url: leaderUrls.facebook,
     });
     if (claimError || !claimId) {
       return NextResponse.json({ error: claimError?.message ?? "Claim failed." }, { status: 400 });
@@ -217,10 +224,10 @@ export async function POST(request: NextRequest) {
       post_image_scale: hasImage ? imageScale : null,
       post_image_offset_x: hasImage ? imageOffsetX : null,
       post_image_offset_y: hasImage ? imageOffsetY : null,
-      leader_x_url: rawLeaderUrls.x,
-      leader_instagram_url: rawLeaderUrls.instagram,
-      leader_tiktok_url: rawLeaderUrls.tiktok,
-      leader_facebook_url: rawLeaderUrls.facebook,
+      leader_x_url: leaderUrls.x,
+      leader_instagram_url: leaderUrls.instagram,
+      leader_tiktok_url: leaderUrls.tiktok,
+      leader_facebook_url: leaderUrls.facebook,
     })
     .select("id")
     .single();
