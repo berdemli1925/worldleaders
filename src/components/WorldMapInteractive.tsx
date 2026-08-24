@@ -34,6 +34,8 @@ interface WorldMapInteractiveProps {
   maxPower: number;
   /** This month's rank (1-based, by total power) keyed by ISO alpha-2 code — shown in the hover tooltip. */
   rankByIso: Map<string, number>;
+  /** ISO code of the #1-ranked country — AŞAMA 6: pulses on the map so the current leader is unmistakable. */
+  leaderIso?: string;
   /** Global "have I voted today, and for which country" — shared with the leaderboard. */
   voteStatus: MyVoteStatus | null;
   /** ISO code of the vote currently being submitted, if any. */
@@ -148,6 +150,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
     powerByIso,
     maxPower,
     rankByIso,
+    leaderIso,
     voteStatus,
     submittingIso,
     voteError,
@@ -176,6 +179,11 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
   // Used by focusCountry below — see src/lib/country-path.ts for why this
   // needs a tie-break, not just a plain by-alpha2 map.
   const countryByAlpha2 = useMemo(() => buildCountryByAlpha2(countries), [countries]);
+  // AŞAMA 6: the #1 country gets a pulsing marker on top of its gold fill —
+  // "Lider olan ülke haritada belirgin şekilde vurgulansın." Undefined (and
+  // so no marker) until the leaderboard has loaded, or if the leader is one
+  // of the handful of territories with no geometry at 50m (see WorldMap.tsx).
+  const leaderCountry = leaderIso ? countryByAlpha2.get(leaderIso) : undefined;
   const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
 
   // Which leadered countries get the full clipped post image vs. the small
@@ -638,6 +646,17 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                     );
                   })}
                 </>
+              )}
+
+              {leaderCountry && (
+                <circle
+                  cx={leaderCountry.centroid[0]}
+                  cy={leaderCountry.centroid[1]}
+                  r={AVATAR_RADIUS_PX / view.scale}
+                  className="fill-accent/40 animate-leader-pulse"
+                  style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                  pointerEvents="none"
+                />
               )}
             </g>
           </svg>

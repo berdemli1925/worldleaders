@@ -2,7 +2,7 @@ import CountdownTimer from "./CountdownTimer";
 
 interface TopBarProps {
   totalVotes: number;
-  onlineCount: number;
+  votesToday: number;
   resetTarget: number | null;
   now: number | null;
 }
@@ -16,17 +16,21 @@ function StatBox({ label, value, mono }: { label: string; value: React.ReactNode
   );
 }
 
-export default function TopBar({ totalVotes, onlineCount, resetTarget, now }: TopBarProps) {
+// AŞAMA 6: "Online now" (a presence count that reads as dead when it's
+// low — exactly the moments a pre-launch/early site is in most) is gone,
+// replaced by "Votes today" — an activity number that's honest at any
+// traffic level and only ever goes up over the course of a day.
+export default function TopBar({ totalVotes, votesToday, resetTarget, now }: TopBarProps) {
   return (
     <div className="flex w-full flex-col gap-3 sm:flex-row">
       <StatBox label="Total votes" value={totalVotes.toLocaleString("en-US")} mono />
       <StatBox
-        label="Online now"
+        label="Votes today"
         mono
         value={
           <span className="flex items-center gap-2">
             <span className="h-2 w-2 shrink-0 rounded-full bg-success" aria-hidden="true" />
-            {onlineCount.toLocaleString("en-US")}
+            {votesToday.toLocaleString("en-US")}
           </span>
         }
       />

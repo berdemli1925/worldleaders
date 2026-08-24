@@ -18,6 +18,11 @@ import countries from "world-countries";
 import { getStartingScore } from "./seed-score";
 import { supabaseAdmin } from "./supabase/admin";
 
+export interface RecentVote {
+  isoCode: string;
+  createdAt: number;
+}
+
 export interface MomentumData {
   /** Rank right now, this month. */
   rankNow: Map<string, number>;
@@ -25,11 +30,23 @@ export interface MomentumData {
   rank7dAgo: Map<string, number>;
   voteCountNow: Map<string, number>;
   votesLast24h: Map<string, number>;
+  /** Total real votes cast since UTC midnight today — AŞAMA 6's "Votes today" stat. */
+  votesToday: number;
+  /** Most recent votes, newest first — AŞAMA 6's live feed. Country only, no
+   * voter identity is ever tracked, so there's nothing more specific to show. */
+  recentVotes: RecentVote[];
 }
+
+const RECENT_VOTES_LIMIT = 20;
 
 function currentMonthStartIso(): string {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
+
+function todayStartUtcIso(): string {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
 }
 
 function zeroMap(keys: string[]): Map<string, number> {
@@ -65,6 +82,8 @@ export async function getMomentumData(): Promise<MomentumData> {
   const nowMs = Date.now();
   const cutoff24h = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString();
   const cutoff7d = new Date(nowMs - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const todayStart = todayStartUtcIso();
+  let votesToday = 0;
 
   // One query, aggregated in JS below — cheap enough at this site's current
   // vote volume (pre-launch) and avoids needing a Postgres function/view
@@ -76,19 +95,28 @@ export async function getMomentumData(): Promise<MomentumData> {
     .select("country_iso_code, created_at")
     .gte("created_at", currentMonthStartIso());
 
-  if (!error && data) {
-    for (const row of data as { country_iso_code: string; created_at: string }[]) {
-      bump(countsNow, row.country_iso_code);
-      if (row.created_at < cutoff24h) {
-        bump(counts24hAgo, row.country_iso_code);
-      } else {
-        bump(votes24h, row.country_iso_code);
-      }
-      if (row.created_at < cutoff7d) {
-        bump(counts7dAgo, row.country_iso_code);
-      }
+  const rows = !error && data ? (data as { country_iso_code: string; created_at: string }[]) : [];
+
+  for (const row of rows) {
+    bump(countsNow, row.country_iso_code);
+    if (row.created_at < cutoff24h) {
+      bump(counts24hAgo, row.country_iso_code);
+    } else {
+      bump(votes24h, row.country_iso_code);
+    }
+    if (row.created_at < cutoff7d) {
+      bump(counts7dAgo, row.country_iso_code);
+    }
+    if (row.created_at >= todayStart) {
+      votesToday += 1;
     }
   }
+
+  const recentVotes = rows
+    .slice()
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .slice(0, RECENT_VOTES_LIMIT)
+    .map((row) => ({ isoCode: row.country_iso_code, createdAt: new Date(row.created_at).getTime() }));
 
   return {
     rankNow: rankFromCounts(countsNow),
@@ -96,6 +124,8 @@ export async function getMomentumData(): Promise<MomentumData> {
     rank7dAgo: rankFromCounts(counts7dAgo),
     voteCountNow: countsNow,
     votesLast24h: votes24h,
+    votesToday,
+    recentVotes,
   };
 }
 
@@ -105,6 +135,8 @@ export interface SerializedMomentum {
   rank7dAgo: Record<string, number>;
   voteCountNow: Record<string, number>;
   votesLast24h: Record<string, number>;
+  votesToday: number;
+  recentVotes: RecentVote[];
 }
 
 export function serializeMomentum(data: MomentumData): SerializedMomentum {
@@ -115,5 +147,7 @@ export function serializeMomentum(data: MomentumData): SerializedMomentum {
     rank7dAgo: toObject(data.rank7dAgo),
     voteCountNow: toObject(data.voteCountNow),
     votesLast24h: toObject(data.votesLast24h),
+    votesToday: data.votesToday,
+    recentVotes: data.recentVotes,
   };
 }

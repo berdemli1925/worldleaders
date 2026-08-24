@@ -30,6 +30,7 @@
   --font-sans: var(--font-display);
   --font-mono: var(--font-mono-numeric);
   --animate-ticker: ticker-scroll 42s linear infinite;
+  --animate-leader-pulse: leader-pulse 2.2s ease-out infinite;
 }
 
 body {
@@ -44,6 +45,23 @@ body {
   }
   to {
     transform: translateX(-50%);
+  }
+}
+
+/* Map leader marker — AŞAMA 6, see WorldMapInteractive.tsx. Expands and
+   fades from the #1 country's centroid, looping. transform-box: fill-box
+   (set inline on the <circle>) makes `scale` grow from the circle's own
+   center instead of the SVG viewBox's origin, which is CSS's odd default
+   for SVG shapes. */
+@keyframes leader-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
   }
 }
 

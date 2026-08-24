@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
@@ -210,6 +210,39 @@ export default function Leaderboard({
     );
   }, [withLeaderInfo, continent, leaderFilter, search, sortMode, sortValue]);
 
+  // AŞAMA 6: "Sıralama değiştiğinde satırlar yumuşak bir animasyonla yer
+  // değiştirsin" — a plain FLIP (First, Last, Invert, Play): each row's
+  // *previous* screen position is compared to its new one after every
+  // reorder, and any that moved get an instant, transition-free translate
+  // back to where they used to be, then are released into a transition to
+  // 0 — so the row visibly slides from old spot to new instead of jumping.
+  const rowRefs = useRef(new Map<string, HTMLElement>());
+  const prevTopByIso = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const nextTopByIso = new Map<string, number>();
+    rowRefs.current.forEach((el, iso) => nextTopByIso.set(iso, el.getBoundingClientRect().top));
+
+    rowRefs.current.forEach((el, iso) => {
+      const prevTop = prevTopByIso.current.get(iso);
+      const nextTop = nextTopByIso.get(iso);
+      if (prevTop === undefined || nextTop === undefined || prevTop === nextTop) return;
+      const delta = prevTop - nextTop;
+      el.style.transition = "none";
+      el.style.transform = `translateY(${delta}px)`;
+      // Two rAFs: one to let the transform above actually paint before the
+      // transition is re-enabled, one more because some browsers otherwise
+      // batch both style writes into the same frame and skip the animation.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.style.transition = "transform 400ms ease";
+          el.style.transform = "";
+        });
+      });
+    });
+
+    prevTopByIso.current = nextTopByIso;
+  }, [filtered]);
+
   return (
     <section className="flex w-full flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -332,6 +365,10 @@ export default function Leaderboard({
             <article
               key={entry.isoCode}
               id={`country-${entry.isoCode}`}
+              ref={(el) => {
+                if (el) rowRefs.current.set(entry.isoCode, el);
+                else rowRefs.current.delete(entry.isoCode);
+              }}
               className={`overflow-hidden rounded-2xl border bg-surface transition-shadow ${
                 highlightedIso === entry.isoCode ? "border-accent ring-2 ring-accent" : "border-border"
               }`}

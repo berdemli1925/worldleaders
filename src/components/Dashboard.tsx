@@ -10,6 +10,7 @@ import { mapThroneRow, type ThroneClaimHistoryEntry, type ThroneEntry, type Thro
 import { useVote } from "@/lib/use-vote";
 import ClosestBattles from "./ClosestBattles";
 import Hero from "./Hero";
+import LiveFeed from "./LiveFeed";
 import Leaderboard, { type LeaderboardEntry } from "./Leaderboard";
 import LeaderTicker, { type TickerItem } from "./LeaderTicker";
 import TopBar from "./TopBar";
@@ -29,7 +30,6 @@ interface DashboardProps {
 
 const VOTES_CHANNEL = "votes-updates";
 const THRONES_CHANNEL = "thrones-updates";
-const PRESENCE_CHANNEL = "online-visitors";
 const HIGHLIGHT_DURATION_MS = 2200;
 
 function nextUtcMidnight(from: number): number {
@@ -42,7 +42,6 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
   const [allTimeEntries, setAllTimeEntries] = useState<LeaderboardEntry[]>([]);
   const [thrones, setThrones] = useState<ThroneEntry[]>([]);
   const [claimHistory, setClaimHistory] = useState<ThroneClaimHistoryEntry[]>([]);
-  const [onlineCount, setOnlineCount] = useState(1);
   const [highlightedIso, setHighlightedIso] = useState<string | null>(null);
   const votesChannelRef = useRef<RealtimeChannel | null>(null);
   const thronesChannelRef = useRef<RealtimeChannel | null>(null);
@@ -197,29 +196,6 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     return () => {
       cancelled = true;
       clearInterval(id);
-    };
-  }, []);
-
-  // Presence channel: every open tab tracks itself; the online count is just
-  // the size of the resulting presence set. Ephemeral, not stored in Postgres.
-  useEffect(() => {
-    const presenceKey = Math.random().toString(36).slice(2);
-    const channel = supabaseBrowser.channel(PRESENCE_CHANNEL, {
-      config: { presence: { key: presenceKey } },
-    });
-
-    channel
-      .on("presence", { event: "sync" }, () => {
-        setOnlineCount(Object.keys(channel.presenceState()).length);
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({ online_at: new Date().toISOString() });
-        }
-      });
-
-    return () => {
-      supabaseBrowser.removeChannel(channel);
     };
   }, []);
 
@@ -382,7 +358,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
           onSelectCountry={handleTickerSelect}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <TopBar totalVotes={totalVotes} onlineCount={onlineCount} resetTarget={resetTarget} now={now} />
+          <TopBar totalVotes={totalVotes} votesToday={momentum?.votesToday ?? 0} resetTarget={resetTarget} now={now} />
           <div className="w-full rounded-2xl border border-border bg-surface p-4">
             <WorldMapInteractive
               ref={mapRef}
@@ -393,6 +369,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
               powerByIso={powerByIso}
               maxPower={maxPower}
               rankByIso={rankByIso}
+              leaderIso={entries[0]?.isoCode}
               voteStatus={voteStatus}
               submittingIso={submittingIso}
               voteError={voteError}
@@ -410,6 +387,12 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         submittingIso={submittingIso}
         onVote={castVoteWithResult}
         onSelectCountry={handleTickerSelect}
+      />
+      <LiveFeed
+        recentVotes={momentum?.recentVotes ?? []}
+        claimHistory={claimHistory}
+        countryNameByIso={countryNameByIso}
+        now={now}
       />
       <Leaderboard
         countries={countries}
