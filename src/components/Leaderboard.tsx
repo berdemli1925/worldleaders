@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
+import { buildShareText, countryShareUrl, openShareWindow, xIntentUrl } from "@/lib/share";
 import { isVacant, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import Flag from "./Flag";
@@ -44,13 +45,10 @@ type LeaderFilter = "all" | "has" | "none";
 
 // Opens an X share-intent window pre-filled with a link back to this
 // country (?country=XX, read by page.tsx's generateMetadata for the
-// per-country OG card — see /api/og/country) — no popup blocked, since
-// this only ever runs from a direct click.
-function shareOnX(isoCode: string, countryName: string, rank: number, voteCount: number): void {
-  const url = `https://worldleaders.lol/?country=${isoCode}`;
-  const text = `${countryName} is ranked #${rank} on World Leaders with ${voteCount.toLocaleString("en-US")} votes.`;
-  const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-  window.open(intentUrl, "_blank", "noopener,noreferrer");
+// per-country OG card — see /api/og/country). Same text/link builders as
+// the post-vote result screen — see src/lib/share.ts.
+function shareOnX(isoCode: string, countryName: string, rank: number): void {
+  openShareWindow(xIntentUrl(buildShareText(countryName, rank), countryShareUrl(isoCode)));
 }
 
 type Period = "month" | "allTime";
@@ -277,7 +275,7 @@ export default function Leaderboard({
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation();
-                      shareOnX(entry.isoCode, entry.name, index + 1, entry.voteCount);
+                      shareOnX(entry.isoCode, entry.name, index + 1);
                     }}
                     aria-label={`Share ${entry.name} on X`}
                     title="Share on X"

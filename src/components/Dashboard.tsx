@@ -11,6 +11,7 @@ import Leaderboard, { type LeaderboardEntry } from "./Leaderboard";
 import LeaderTicker, { type TickerItem } from "./LeaderTicker";
 import TopBar from "./TopBar";
 import TurnstileWidget, { type TurnstileWidgetHandle } from "./TurnstileWidget";
+import VoteResultModal, { type VoteResult } from "./VoteResultModal";
 import WorldMapInteractive, { type CountryPath, type WorldMapHandle } from "./WorldMapInteractive";
 
 interface DashboardProps {
@@ -84,6 +85,10 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     ]);
     if (month) setEntries(month);
     if (allTime) setAllTimeEntries(allTime);
+    // Returned (not just set as state) so callers that need the *freshly
+    // fetched* ranking right away — see handleVoteCast below — don't have
+    // to wait an extra render for `entries` state to catch up.
+    return month;
   }, [fetchRanking]);
 
   // Initial load. fetchLeaderboard is an async data-fetching call (setState
@@ -187,9 +192,51 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     };
   }, []);
 
-  const handleVoteCast = useCallback(() => {
-    fetchLeaderboard();
+  // Snapshot of the vote in flight — rank/votes *before* it lands — so
+  // handleVoteCast below can diff against the freshly-fetched ranking and
+  // build the AŞAMA 2 result screen ("Turkey moved up to #4", nearest
+  // rival, …). A ref, not state: it's write-then-read-once bookkeeping for
+  // a single async round trip, not something that should trigger a render.
+  const pendingVoteRef = useRef<{ isoCode: string; prevRank: number | undefined; prevVoteCount: number } | null>(
+    null,
+  );
+  const [voteResult, setVoteResult] = useState<VoteResult | null>(null);
+
+  const handleVoteCast = useCallback(async () => {
+    const fresh = await fetchLeaderboard();
     votesChannelRef.current?.send({ type: "broadcast", event: "vote-cast", payload: {} });
+
+    const pending = pendingVoteRef.current;
+    pendingVoteRef.current = null;
+    if (!pending || !fresh) return;
+
+    const newIndex = fresh.findIndex((entry) => entry.isoCode === pending.isoCode);
+    const newEntry = newIndex >= 0 ? fresh[newIndex] : undefined;
+    if (!newEntry) return;
+    const newRank = newIndex + 1;
+
+    // Nearest rival: whoever's immediately above in rank (the one worth
+    // catching), or — if this country is already #1 — whoever's immediately
+    // below (the one worth watching).
+    const rivalEntry = newIndex > 0 ? fresh[newIndex - 1] : fresh[newIndex + 1];
+    const rival = rivalEntry
+      ? {
+          isoCode: rivalEntry.isoCode,
+          name: rivalEntry.name,
+          voteCount: rivalEntry.voteCount,
+          direction: (newIndex > 0 ? "ahead" : "behind") as "ahead" | "behind",
+        }
+      : null;
+
+    setVoteResult({
+      isoCode: pending.isoCode,
+      countryName: newEntry.name,
+      newRank,
+      newVoteCount: newEntry.voteCount,
+      prevRank: pending.prevRank,
+      voteDelta: newEntry.voteCount - pending.prevVoteCount,
+      rival,
+    });
   }, [fetchLeaderboard]);
 
   const getTurnstileToken = useCallback(async () => {
@@ -201,6 +248,24 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     getTurnstileToken,
     onVoteCast: handleVoteCast,
   });
+
+  // Wraps castVote so every entry point (hero, map panel, leaderboard rows)
+  // snapshots "where this country stood" right before the vote lands —
+  // castVote itself has no rank/vote-count context, only an ISO code.
+  // `entries` is already sorted desc by vote count (see fetchRanking), so
+  // rank is just its index.
+  const castVoteWithResult = useCallback(
+    (isoCode: string) => {
+      const index = entries.findIndex((entry) => entry.isoCode === isoCode);
+      pendingVoteRef.current = {
+        isoCode,
+        prevRank: index >= 0 ? index + 1 : undefined,
+        prevVoteCount: index >= 0 ? entries[index].voteCount : 0,
+      };
+      castVote(isoCode);
+    },
+    [castVote, entries],
+  );
 
   const totalVotes = useMemo(() => entries.reduce((sum, entry) => sum + entry.voteCount, 0), [entries]);
   const maxVotes = useMemo(() => Math.max(1, ...entries.map((entry) => entry.voteCount)), [entries]);
@@ -273,7 +338,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
           serverGuessIso={guessCountryIso}
           voteStatus={voteStatus}
           submittingIso={submittingIso}
-          onVote={castVote}
+          onVote={castVoteWithResult}
           onSelectCountry={handleTickerSelect}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -290,7 +355,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
               voteStatus={voteStatus}
               submittingIso={submittingIso}
               voteError={voteError}
-              onVote={castVote}
+              onVote={castVoteWithResult}
               thrones={thrones}
               claimHistory={claimHistory}
               now={now}
@@ -308,7 +373,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         voteStatus={voteStatus}
         submittingIso={submittingIso}
         voteError={voteError}
-        onVote={castVote}
+        onVote={castVoteWithResult}
         highlightedIso={highlightedIso}
         thrones={thrones}
         claimHistory={claimHistory}
@@ -316,6 +381,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         onSelectCountry={handleSelectCountry}
       />
       <LeaderTicker items={tickerItems} onSelect={handleTickerSelect} />
+      {voteResult && <VoteResultModal result={voteResult} onClose={() => setVoteResult(null)} />}
     </div>
   );
 }
