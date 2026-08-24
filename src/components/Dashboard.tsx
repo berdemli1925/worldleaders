@@ -403,19 +403,14 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         now={now}
       />
       <Leaderboard
-        countries={countries}
         entries={entries}
         allTimeEntries={allTimeEntries}
-        totalVotes={totalVotes}
-        now={now}
         voteStatus={voteStatus}
         submittingIso={submittingIso}
         voteError={voteError}
         onVote={castVoteWithResult}
         highlightedIso={highlightedIso}
         thrones={thrones}
-        claimHistory={claimHistory}
-        onThroneClaimed={handleThroneClaimed}
         onSelectCountry={handleSelectCountry}
         momentum={momentum}
       />
