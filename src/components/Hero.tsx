@@ -3,14 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getCountryMeta } from "@/lib/country-meta";
+import type { RankedCountry } from "@/lib/rank";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import Flag from "./Flag";
 
-export interface HeroEntry {
-  isoCode: string;
-  name: string;
-  voteCount: number;
-}
+export type HeroEntry = RankedCountry;
 
 interface HeroProps {
   leader?: HeroEntry;
@@ -102,7 +99,9 @@ export default function Hero({
     [entries],
   );
 
-  const gap = leader && runnerUp ? leader.voteCount - runnerUp.voteCount : null;
+  // Total power (AŞAMA 5), not raw votes — it's what actually separates
+  // #1 from #2.
+  const gap = leader && runnerUp ? leader.totalPower - runnerUp.totalPower : null;
 
   return (
     <section className="flex w-full flex-col gap-4 rounded-2xl border border-border bg-surface p-5 sm:p-6 lg:w-[380px] lg:shrink-0">
@@ -124,7 +123,7 @@ export default function Hero({
             <p className="truncate text-lg font-semibold text-foreground">{leader.name}</p>
           </div>
           <p className="shrink-0 font-mono text-lg font-bold text-accent">
-            {leader.voteCount.toLocaleString("en-US")}
+            {leader.totalPower.toLocaleString("en-US")}
           </p>
         </button>
       ) : (

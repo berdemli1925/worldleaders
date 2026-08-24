@@ -7,6 +7,7 @@ import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
 import { getSlugForCountry } from "@/lib/country-slug";
 import type { SerializedMomentum } from "@/lib/momentum";
+import type { RankedCountry } from "@/lib/rank";
 import { buildShareText, countryShareUrl, openShareWindow, xIntentUrl } from "@/lib/share";
 import { isVacant, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
@@ -15,12 +16,10 @@ import ThroneClaimModal from "./ThroneClaimModal";
 import ThronePanel from "./ThronePanel";
 import type { CountryPath } from "./WorldMapInteractive";
 
-export interface LeaderboardEntry {
-  isoCode: string;
-  name: string;
-  continent: string;
-  voteCount: number;
-}
+// Re-exported under this name since every existing caller (Dashboard,
+// ClosestBattles, VoteResultModal, ...) already imports LeaderboardEntry
+// from here — see src/lib/rank.ts for the actual shape/ranking logic.
+export type LeaderboardEntry = RankedCountry;
 
 interface LeaderboardProps {
   /** Same per-country path/bounds data the map uses — only needed here so a claim's image positioner can clip to the country's real shape (see WorldMap.tsx). */
@@ -199,8 +198,10 @@ export default function Leaderboard({
       return true;
     });
     if (sortMode === "votes") {
+      // Total power (AŞAMA 5), not raw votes — this is the site's actual
+      // rank order, matching the hero/map/country pages.
       return [...list].sort(
-        (a, b) => b.entry.voteCount - a.entry.voteCount || a.entry.name.localeCompare(b.entry.name),
+        (a, b) => b.entry.totalPower - a.entry.totalPower || a.entry.name.localeCompare(b.entry.name),
       );
     }
     return [...list].sort(
@@ -372,11 +373,17 @@ export default function Leaderboard({
                   <p className="truncate text-xs text-muted-2">{meta?.capital ?? "Unknown capital"}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
+                  {/* Total power (AŞAMA 5) is the number that drives rank —
+                      real votes shown right under it so the two never get
+                      conflated. Full Starting score/Votes/Total power
+                      breakdown is in the expanded card below. */}
                   <div className="text-right">
                     <p className="font-mono text-sm font-semibold text-foreground">
-                      {entry.voteCount.toLocaleString("en-US")}
+                      {entry.totalPower.toLocaleString("en-US")}
                     </p>
-                    <p className="font-mono text-xs text-muted">{pct.toFixed(1)}%</p>
+                    <p className="font-mono text-xs text-muted">
+                      {entry.voteCount.toLocaleString("en-US")} vote{entry.voteCount === 1 ? "" : "s"}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -432,6 +439,30 @@ export default function Leaderboard({
               >
                 <div className="overflow-hidden">
                   <div className="border-t border-border bg-black/15 p-4">
+                    {/* AŞAMA 5: "Starting score / Votes / Total power"
+                        breakdown — required to be shown, distinctly, on
+                        every country's card. */}
+                    <div className="mb-4 grid grid-cols-3 gap-2 rounded-xl border border-border bg-black/20 p-3 text-center">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-2">Starting score</p>
+                        <p className="font-mono text-sm font-semibold text-foreground">
+                          {entry.startingScore.toLocaleString("en-US")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-2">Votes</p>
+                        <p className="font-mono text-sm font-semibold text-foreground">
+                          {entry.voteCount.toLocaleString("en-US")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-accent">Total power</p>
+                        <p className="font-mono text-sm font-semibold text-accent">
+                          {entry.totalPower.toLocaleString("en-US")}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mb-4 text-xs text-muted-2">{pct.toFixed(1)}% of this month&apos;s real votes.</p>
                     <ThronePanel
                       isoCode={entry.isoCode}
                       throne={throne}

@@ -27,7 +27,9 @@ function findClosestBattles(entries: LeaderboardEntry[]) {
     // name only — every one of those adjacent pairs would tie for closest
     // and crowd out the real ones.
     if (a.voteCount === 0 && b.voteCount === 0) continue;
-    battles.push({ a, b, gap: a.voteCount - b.voteCount });
+    // Total power (AŞAMA 5), not raw votes — the gap that actually
+    // separates these two in rank.
+    battles.push({ a, b, gap: a.totalPower - b.totalPower });
   }
   return battles.sort((x, y) => x.gap - y.gap).slice(0, MAX_BATTLES);
 }
@@ -52,7 +54,7 @@ export default function ClosestBattles({ entries, submittingIso, onVote, onSelec
                 <Flag alpha2={side.isoCode} width={24} />
                 <span className="min-w-0 flex-1 truncate text-sm text-foreground">{side.name}</span>
                 <span className="shrink-0 font-mono text-xs text-muted">
-                  {side.voteCount.toLocaleString("en-US")}
+                  {side.totalPower.toLocaleString("en-US")}
                 </span>
                 <span
                   role="button"
@@ -68,7 +70,7 @@ export default function ClosestBattles({ entries, submittingIso, onVote, onSelec
               </button>
             ))}
             <p className="px-1 text-center text-[11px] text-muted-2">
-              {gap === 0 ? "Tied" : `${gap.toLocaleString("en-US")} vote${gap === 1 ? "" : "s"} apart`}
+              {gap === 0 ? "Tied" : `${gap.toLocaleString("en-US")} point${gap === 1 ? "" : "s"} apart`}
             </p>
           </div>
         ))}

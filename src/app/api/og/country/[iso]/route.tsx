@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
 import { getCountryMeta } from "@/lib/country-meta";
+import { getRankedLeaderboard } from "@/lib/country-rank";
 import { flagUrl } from "@/lib/flag";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -15,8 +16,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ iso
   const isoCode = iso.toUpperCase();
   const meta = getCountryMeta(isoCode);
 
-  const [{ data: ranking }, { data: throneRow }] = await Promise.all([
-    supabaseAdmin.from("leaderboard").select("iso_code, vote_count").order("vote_count", { ascending: false }),
+  const [rows, { data: throneRow }] = await Promise.all([
+    getRankedLeaderboard(), // ranked by total power (AŞAMA 5) — see src/lib/rank.ts
     supabaseAdmin
       .from("thrones_with_leader")
       .select("x_handle")
@@ -25,9 +26,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ iso
       .maybeSingle(),
   ]);
 
-  const rows = (ranking ?? []) as { iso_code: string; vote_count: number }[];
-  const rank = rows.findIndex((row) => row.iso_code === isoCode);
-  const voteCount = rank >= 0 ? rows[rank].vote_count : 0;
+  const rank = rows.findIndex((row) => row.isoCode === isoCode);
+  const voteCount = rank >= 0 ? rows[rank].voteCount : 0;
 
   return new ImageResponse(
     (

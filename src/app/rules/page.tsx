@@ -35,6 +35,21 @@ export default function RulesPage() {
             </ul>
           </section>
 
+          <section className="flex flex-col gap-2">
+            <h2 className="text-base font-semibold text-foreground">Starting scores</h2>
+            <ul className="list-inside list-disc space-y-1">
+              <li>Every country begins the month with a <strong className="text-foreground">starting score</strong> between
+                50 and 300, so the map and leaderboard show real variation from the first vote rather than 250
+                identical, empty-looking countries.</li>
+              <li>Starting scores are assigned by a fixed formula based on each country&apos;s code — not by
+                population or any other real-world measure, so small countries don&apos;t start behind — and not
+                randomly: the same country always gets the same starting score.</li>
+              <li>A country&apos;s rank is its <strong className="text-foreground">total power</strong>: starting
+                score plus real votes. The two are always shown separately — a starting score is never counted or
+                described as a vote.</li>
+            </ul>
+          </section>
+
           {!PAYMENTS_ENABLED && (
             <section className="flex flex-col gap-2 rounded-xl border border-accent/30 bg-accent/10 p-4">
               <h2 className="text-base font-semibold text-accent">Leadership is free during the beta</h2>

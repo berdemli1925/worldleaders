@@ -26,11 +26,13 @@ interface WorldMapInteractiveProps {
   countries: CountryPath[];
   width: number;
   height: number;
-  /** Live vote counts keyed by ISO alpha-2 code, used to color the map. */
+  /** Live real vote counts keyed by ISO alpha-2 code — shown in the tooltip/aria-label, never used for coloring (see AŞAMA 5). */
   voteCounts: Map<string, number>;
-  /** Highest count across all countries — the top of the color scale. */
-  maxVotes: number;
-  /** This month's rank (1-based) keyed by ISO alpha-2 code — shown in the hover tooltip. */
+  /** Total power (starting score + votes) keyed by ISO alpha-2 code — drives the map's fill color. */
+  powerByIso: Map<string, number>;
+  /** Highest total power across all countries — the top of the color scale. */
+  maxPower: number;
+  /** This month's rank (1-based, by total power) keyed by ISO alpha-2 code — shown in the hover tooltip. */
   rankByIso: Map<string, number>;
   /** Global "have I voted today, and for which country" — shared with the leaderboard. */
   voteStatus: MyVoteStatus | null;
@@ -143,7 +145,8 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
     width,
     height,
     voteCounts,
-    maxVotes,
+    powerByIso,
+    maxPower,
     rankByIso,
     voteStatus,
     submittingIso,
@@ -494,6 +497,11 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
               {countries.map((country) => {
                 const isSelected = country.id === selectedId;
                 const voteCount = country.alpha2 ? (voteCounts.get(country.alpha2) ?? 0) : 0;
+                // Fill color is driven by total power (AŞAMA 5: starting
+                // score + votes), not the real vote count above — that's
+                // what gives the map visible variation before real votes
+                // accumulate. The aria-label stays real-votes-only.
+                const power = country.alpha2 ? (powerByIso.get(country.alpha2) ?? 0) : 0;
                 return (
                   <path
                     key={country.id}
@@ -506,7 +514,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                     onKeyDown={(event) => handleKeyDown(event, country.id)}
                     strokeWidth={isSelected ? 1.5 : 0.5}
                     vectorEffect="non-scaling-stroke"
-                    style={{ fill: voteCountToColor(voteCount, maxVotes) }}
+                    style={{ fill: voteCountToColor(power, maxPower) }}
                     className={
                       isSelected
                         ? "cursor-pointer stroke-accent outline-none transition-opacity hover:opacity-75"

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import type { SerializedMomentum } from "@/lib/momentum";
+import { toRankedEntries } from "@/lib/rank";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { mapThroneRow, type ThroneClaimHistoryEntry, type ThroneEntry, type ThroneRow } from "@/lib/throne";
 import { useVote } from "@/lib/use-vote";
@@ -66,18 +67,20 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
   // ranking) and "leaderboard_all_time" (cumulative, backs the "All time"
   // tab) are two Supabase views with the identical column shape, differing
   // only in whether vote_count is date-scoped. See scripts/setup-monthly-archive.mjs.
+  // toRankedEntries (AŞAMA 5) adds each country's starting score and sorts
+  // by total power, not raw votes — see src/lib/rank.ts.
   const fetchRanking = useCallback(async (view: "leaderboard" | "leaderboard_all_time") => {
     const { data, error } = await supabaseBrowser.from(view).select("iso_code, name, continent, vote_count");
     if (error || !data) return null;
 
-    return (data as { iso_code: string; name: string; continent: string; vote_count: number }[])
-      .map((row) => ({
+    return toRankedEntries(
+      (data as { iso_code: string; name: string; continent: string; vote_count: number }[]).map((row) => ({
         isoCode: row.iso_code,
         name: row.name,
         continent: row.continent,
         voteCount: row.vote_count,
-      }))
-      .sort((a, b) => b.voteCount - a.voteCount || a.name.localeCompare(b.name));
+      })),
+    );
   }, []);
 
   const fetchLeaderboard = useCallback(async () => {
@@ -245,13 +248,14 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
 
     // Nearest rival: whoever's immediately above in rank (the one worth
     // catching), or — if this country is already #1 — whoever's immediately
-    // below (the one worth watching).
+    // below (the one worth watching). Gap is in total power (AŞAMA 5),
+    // matching what actually separates their ranks — see VoteResultModal.
     const rivalEntry = newIndex > 0 ? fresh[newIndex - 1] : fresh[newIndex + 1];
     const rival = rivalEntry
       ? {
           isoCode: rivalEntry.isoCode,
           name: rivalEntry.name,
-          voteCount: rivalEntry.voteCount,
+          totalPower: rivalEntry.totalPower,
           direction: (newIndex > 0 ? "ahead" : "behind") as "ahead" | "behind",
         }
       : null;
@@ -261,6 +265,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
       countryName: newEntry.name,
       newRank,
       newVoteCount: newEntry.voteCount,
+      newTotalPower: newEntry.totalPower,
       prevRank: pending.prevRank,
       voteDelta: newEntry.voteCount - pending.prevVoteCount,
       rival,
@@ -295,13 +300,20 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     [castVote, entries],
   );
 
+  // Real votes only — the top stat bar and the map hover tooltip's "N
+  // votes" both need to stay honest about what's an actual vote (AŞAMA 5:
+  // starting scores are never presented as votes).
   const totalVotes = useMemo(() => entries.reduce((sum, entry) => sum + entry.voteCount, 0), [entries]);
-  const maxVotes = useMemo(() => Math.max(1, ...entries.map((entry) => entry.voteCount)), [entries]);
   const voteCounts = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.voteCount])), [entries]);
+  // Total power (starting score + votes) drives the map's color scale
+  // instead — AŞAMA 5's whole point is that the map looks alive from day
+  // one, not flat until real votes accumulate.
+  const maxPower = useMemo(() => Math.max(1, ...entries.map((entry) => entry.totalPower)), [entries]);
+  const powerByIso = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.totalPower])), [entries]);
   const resetTarget = useMemo(() => (now !== null ? nextUtcMidnight(now) : null), [now]);
-  // `entries` is already sorted desc by vote count (see fetchRanking) — rank
-  // is just its index. Shared by the hero ("Your country — ranked #N") and
-  // the map's hover tooltip (see WorldMapInteractive).
+  // `entries` is already sorted desc by total power (see toRankedEntries) —
+  // rank is just its index. Shared by the hero ("Your country — ranked
+  // #N") and the map's hover tooltip (see WorldMapInteractive).
   const rankByIso = useMemo(() => new Map(entries.map((entry, index) => [entry.isoCode, index + 1])), [entries]);
 
   const countryNameByIso = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.name])), [entries]);
@@ -378,7 +390,8 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
               width={width}
               height={height}
               voteCounts={voteCounts}
-              maxVotes={maxVotes}
+              powerByIso={powerByIso}
+              maxPower={maxPower}
               rankByIso={rankByIso}
               voteStatus={voteStatus}
               submittingIso={submittingIso}

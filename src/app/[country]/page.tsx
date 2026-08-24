@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import CountryVoteButton from "@/components/CountryVoteButton";
 import Flag from "@/components/Flag";
 import { getCountryMeta } from "@/lib/country-meta";
+import { getRankedLeaderboard } from "@/lib/country-rank";
 import { getCountryBySlug, getAllCountrySlugs } from "@/lib/country-slug";
 import { getCountryPath } from "@/lib/country-topology";
 import { getMomentumData } from "@/lib/momentum";
@@ -22,8 +23,8 @@ async function loadCountryPage(slug: string) {
   const entry = getCountryBySlug(slug);
   if (!entry) return null;
 
-  const [{ data: rankingRows }, { data: throneRow }, momentum] = await Promise.all([
-    supabaseAdmin.from("leaderboard").select("iso_code, vote_count").order("vote_count", { ascending: false }),
+  const [rows, { data: throneRow }, momentum] = await Promise.all([
+    getRankedLeaderboard(), // ranked by total power (AŞAMA 5) — see src/lib/rank.ts
     supabaseAdmin
       .from("thrones_with_leader")
       .select("x_handle, brand_title, description, link_url, logo_url, current_value, cycle_end")
@@ -33,12 +34,14 @@ async function loadCountryPage(slug: string) {
     getMomentumData(),
   ]);
 
-  const rows = (rankingRows ?? []) as { iso_code: string; vote_count: number }[];
-  const index = rows.findIndex((row) => row.iso_code === entry.alpha2);
+  const index = rows.findIndex((row) => row.isoCode === entry.alpha2);
   const rank = index >= 0 ? index + 1 : rows.length + 1;
-  const voteCount = index >= 0 ? rows[index].vote_count : 0;
+  const row = index >= 0 ? rows[index] : null;
+  const voteCount = row?.voteCount ?? 0;
+  const startingScore = row?.startingScore ?? 0;
+  const totalPower = row?.totalPower ?? 0;
   const nextAbove = index > 0 ? rows[index - 1] : null;
-  const votesToOvertake = nextAbove ? nextAbove.vote_count - voteCount + 1 : null;
+  const votesToOvertake = nextAbove ? nextAbove.totalPower - totalPower + 1 : null;
 
   const rankNow = momentum.rankNow.get(entry.alpha2) ?? rank;
   const rank7dAgo = momentum.rank7dAgo.get(entry.alpha2) ?? rankNow;
@@ -49,7 +52,9 @@ async function loadCountryPage(slug: string) {
     meta: getCountryMeta(entry.alpha2),
     rank,
     voteCount,
-    nextAboveName: nextAbove ? rows.find((r) => r.iso_code === nextAbove.iso_code) : null,
+    startingScore,
+    totalPower,
+    nextAboveName: nextAbove?.name ?? null,
     votesToOvertake,
     weeklyChange,
     throne: throneRow as
@@ -94,7 +99,19 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
   const data = await loadCountryPage(country);
   if (!data) notFound();
 
-  const { entry, meta, rank, voteCount, nextAboveName, votesToOvertake, weeklyChange, throne, mapPath } = data;
+  const {
+    entry,
+    meta,
+    rank,
+    voteCount,
+    startingScore,
+    totalPower,
+    nextAboveName,
+    votesToOvertake,
+    weeklyChange,
+    throne,
+    mapPath,
+  } = data;
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-8 sm:py-12">
@@ -114,9 +131,9 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
             <p className="text-xs text-muted-2">Rank this month</p>
             <p className="font-mono text-2xl font-bold text-foreground">#{rank}</p>
           </div>
-          <div className="rounded-2xl border border-border bg-surface p-4">
-            <p className="text-xs text-muted-2">Votes</p>
-            <p className="font-mono text-2xl font-bold text-foreground">{voteCount.toLocaleString("en-US")}</p>
+          <div className="rounded-2xl border border-accent/40 bg-accent/10 p-4">
+            <p className="text-xs text-accent">Total power</p>
+            <p className="font-mono text-2xl font-bold text-accent">{totalPower.toLocaleString("en-US")}</p>
           </div>
           <div className="col-span-2 rounded-2xl border border-border bg-surface p-4 sm:col-span-1">
             <p className="text-xs text-muted-2">Last 7 days</p>
@@ -130,11 +147,24 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
           </div>
         </div>
 
+        {/* AŞAMA 5: "Starting score / Votes / Total power" breakdown,
+            required to be shown distinctly on every country's page. */}
+        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-surface p-4 text-center">
+          <div>
+            <p className="text-xs text-muted-2">Starting score</p>
+            <p className="font-mono text-lg font-semibold text-foreground">{startingScore.toLocaleString("en-US")}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-2">Real votes</p>
+            <p className="font-mono text-lg font-semibold text-foreground">{voteCount.toLocaleString("en-US")}</p>
+          </div>
+        </div>
+
         {nextAboveName && votesToOvertake !== null && (
           <p className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
             <span className="font-semibold text-foreground">{votesToOvertake.toLocaleString("en-US")}</span> more
             vote{votesToOvertake === 1 ? "" : "s"} to pass{" "}
-            <span className="font-medium text-foreground">{nextAboveName.iso_code}</span> and take #{rank - 1}.
+            <span className="font-medium text-foreground">{nextAboveName}</span> and take #{rank - 1}.
           </p>
         )}
 

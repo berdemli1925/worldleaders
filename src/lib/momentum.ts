@@ -15,6 +15,7 @@
 // for something that fixes itself within a week of every reset.
 import countries from "world-countries";
 
+import { getStartingScore } from "./seed-score";
 import { supabaseAdmin } from "./supabase/admin";
 
 export interface MomentumData {
@@ -39,8 +40,16 @@ function bump(map: Map<string, number>, key: string): void {
   map.set(key, (map.get(key) ?? 0) + 1);
 }
 
+// Ranks by total power (AŞAMA 5: starting score + votes at that point in
+// time), the same metric the main leaderboard/hero/map use — see
+// src/lib/rank.ts. Every snapshot (now, 24h ago, 7d ago) adds the same
+// per-country starting score, so it cancels out of a *change* like the 24h
+// arrow, but it does affect each snapshot's absolute rank order, which is
+// what "biggest climbers"/"rising" ultimately sort by.
 function rankFromCounts(counts: Map<string, number>): Map<string, number> {
-  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const sorted = [...counts.entries()].sort(
+    (a, b) => b[1] + getStartingScore(b[0]) - (a[1] + getStartingScore(a[0])) || a[0].localeCompare(b[0]),
+  );
   const rank = new Map<string, number>();
   sorted.forEach(([iso], index) => rank.set(iso, index + 1));
   return rank;

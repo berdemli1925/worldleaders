@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 import { getCountryMeta } from "@/lib/country-meta";
+import { getRankedLeaderboard } from "@/lib/country-rank";
 import { getGeoCountryIso } from "@/lib/geo";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 import { LogoMark } from "@/components/Logo";
 import WorldMap from "@/components/WorldMap";
 
@@ -20,18 +20,15 @@ export async function generateMetadata({ searchParams }: PageProps<"/">): Promis
   const meta = getCountryMeta(countryParam);
   if (!meta) return {};
 
-  const { data: ranking } = await supabaseAdmin
-    .from("leaderboard")
-    .select("iso_code, vote_count")
-    .order("vote_count", { ascending: false });
-  const rows = (ranking ?? []) as { iso_code: string; vote_count: number }[];
-  const rank = rows.findIndex((row) => row.iso_code === countryParam);
-  const voteCount = rank >= 0 ? rows[rank].vote_count : 0;
+  // Ranked by total power (AŞAMA 5), same as everywhere else — see src/lib/rank.ts.
+  const rows = await getRankedLeaderboard();
+  const rankIndex = rows.findIndex((row) => row.isoCode === countryParam);
+  const voteCount = rankIndex >= 0 ? rows[rankIndex].voteCount : 0;
 
   const title = `${meta.name} — World Leaders`;
   const description =
-    rank >= 0
-      ? `${meta.name} is ranked #${rank + 1} this month with ${voteCount.toLocaleString("en-US")} votes. Vote or claim the throne.`
+    rankIndex >= 0
+      ? `${meta.name} is ranked #${rankIndex + 1} this month with ${voteCount.toLocaleString("en-US")} votes. Vote or claim the throne.`
       : `Vote for ${meta.name}, or claim its throne, on World Leaders.`;
   const imageUrl = `/api/og/country/${countryParam}`;
 

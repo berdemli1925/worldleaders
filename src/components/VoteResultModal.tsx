@@ -17,6 +17,8 @@ export interface VoteResult {
   countryName: string;
   newRank: number;
   newVoteCount: number;
+  /** Starting score + votes (AŞAMA 5) — what the rival gap below is actually measured in. */
+  newTotalPower: number;
   /** Rank before this vote — undefined if unknown (first load) or unchanged from newRank means no movement to call out. */
   prevRank?: number;
   /** How much this vote actually added — 0 for a same-country revote (already voted today), which the API no-ops. */
@@ -24,7 +26,7 @@ export interface VoteResult {
   rival: {
     isoCode: string;
     name: string;
-    voteCount: number;
+    totalPower: number;
     direction: "ahead" | "behind";
   } | null;
 }
@@ -39,7 +41,7 @@ interface VoteResultModalProps {
 // like an event). Dismissible, never blocks the rest of the page.
 export default function VoteResultModal({ result, onClose }: VoteResultModalProps) {
   const [copied, setCopied] = useState(false);
-  const { isoCode, countryName, newRank, newVoteCount, prevRank, voteDelta, rival } = result;
+  const { isoCode, countryName, newRank, newVoteCount, newTotalPower, prevRank, voteDelta, rival } = result;
 
   const moved = prevRank !== undefined && prevRank !== newRank;
   const movedUp = moved && prevRank! > newRank;
@@ -120,9 +122,9 @@ export default function VoteResultModal({ result, onClose }: VoteResultModalProp
           <p className="mt-3 text-center text-sm text-muted">
             <span className="font-medium text-foreground">{rival.name}</span> is only{" "}
             <span className="font-mono font-semibold text-foreground">
-              {Math.abs(rival.voteCount - newVoteCount).toLocaleString("en-US")}
+              {Math.abs(rival.totalPower - newTotalPower).toLocaleString("en-US")}
             </span>{" "}
-            votes {rival.direction}
+            points {rival.direction}
           </p>
         )}
 
