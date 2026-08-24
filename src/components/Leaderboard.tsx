@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
 import { getSlugForCountry } from "@/lib/country-slug";
+import type { SerializedMomentum } from "@/lib/momentum";
 import { buildShareText, countryShareUrl, openShareWindow, xIntentUrl } from "@/lib/share";
 import { isVacant, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
@@ -38,12 +39,30 @@ interface LeaderboardProps {
   onThroneClaimed: () => void;
   /** Pans/zooms the map to a country — fired on row click and on Enter in the search box. */
   onSelectCountry: (isoCode: string) => void;
+  /** AŞAMA 4 rank/vote snapshots — null until the first poll lands (see Dashboard.tsx). */
+  momentum: SerializedMomentum | null;
 }
 
 const CONTINENTS = ["All", "Europe", "Asia", "Africa", "Americas", "Oceania"] as const;
 type ContinentFilter = (typeof CONTINENTS)[number];
 
 type LeaderFilter = "all" | "has" | "none";
+
+// AŞAMA 4 — additional sort modes layered on top of the existing period/
+// continent/leader filters, all derived from the same momentum snapshot
+// (see src/lib/momentum.ts):
+//  - climbers: biggest positive rank change over the last 7 days
+//  - rising: fastest-growing by rate (24h votes relative to what a country
+//    had before), so a small country picking up steam outranks a top
+//    country's much larger but proportionally smaller gain
+//  - active: most raw votes in the last 24 hours
+type SortMode = "votes" | "climbers" | "rising" | "active";
+const SORT_MODES: [SortMode, string][] = [
+  ["votes", "Ranking"],
+  ["climbers", "Biggest climbers"],
+  ["rising", "Rising"],
+  ["active", "Most active today"],
+];
 
 // Opens an X share-intent window pre-filled with a link back to this
 // country (?country=XX, read by page.tsx's generateMetadata for the
@@ -74,11 +93,13 @@ export default function Leaderboard({
   claimHistory,
   onThroneClaimed,
   onSelectCountry,
+  momentum,
 }: LeaderboardProps) {
   const [search, setSearch] = useState("");
   const [continent, setContinent] = useState<ContinentFilter>("All");
   const [leaderFilter, setLeaderFilter] = useState<LeaderFilter>("all");
   const [period, setPeriod] = useState<Period>("month");
+  const [sortMode, setSortMode] = useState<SortMode>("votes");
   const [openClaimIso, setOpenClaimIso] = useState<string | null>(null);
   // Accordion: at most one card's details are open at a time. Separate from
   // openClaimIso above — that's "which country's claim modal overlay is
@@ -129,6 +150,45 @@ export default function Leaderboard({
   );
   const noLeaderCount = withLeaderInfo.length - hasLeaderCount;
 
+  // Rank change over the last 24h, global (not affected by the filters
+  // below) — positive means it climbed that many places. Shared by the
+  // arrow next to every row's rank number and the "climbers"/"rising"/
+  // "active" sort modes.
+  const rankChange24h = useCallback(
+    (isoCode: string): number | null => {
+      if (!momentum) return null;
+      const now = momentum.rankNow[isoCode];
+      const before = momentum.rank24hAgo[isoCode];
+      if (now === undefined || before === undefined) return null;
+      return before - now;
+    },
+    [momentum],
+  );
+
+  const sortValue = useCallback(
+    (isoCode: string): number => {
+      if (!momentum) return 0;
+      switch (sortMode) {
+        case "climbers": {
+          const now = momentum.rankNow[isoCode];
+          const before = momentum.rank7dAgo[isoCode];
+          return now !== undefined && before !== undefined ? before - now : 0;
+        }
+        case "rising": {
+          const total = momentum.voteCountNow[isoCode] ?? 0;
+          const last24h = momentum.votesLast24h[isoCode] ?? 0;
+          const before = Math.max(1, total - last24h);
+          return last24h / before;
+        }
+        case "active":
+          return momentum.votesLast24h[isoCode] ?? 0;
+        default:
+          return 0;
+      }
+    },
+    [momentum, sortMode],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const list = withLeaderInfo.filter(({ entry, throne }) => {
@@ -138,10 +198,16 @@ export default function Leaderboard({
       if (q && !entry.name.toLowerCase().includes(q) && !entry.isoCode.toLowerCase().includes(q)) return false;
       return true;
     });
+    if (sortMode === "votes") {
+      return [...list].sort(
+        (a, b) => b.entry.voteCount - a.entry.voteCount || a.entry.name.localeCompare(b.entry.name),
+      );
+    }
     return [...list].sort(
-      (a, b) => b.entry.voteCount - a.entry.voteCount || a.entry.name.localeCompare(b.entry.name),
+      (a, b) =>
+        sortValue(b.entry.isoCode) - sortValue(a.entry.isoCode) || a.entry.name.localeCompare(b.entry.name),
     );
-  }, [withLeaderInfo, continent, leaderFilter, search]);
+  }, [withLeaderInfo, continent, leaderFilter, search, sortMode, sortValue]);
 
   return (
     <section className="flex w-full flex-col gap-4">
@@ -207,6 +273,27 @@ export default function Leaderboard({
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Sort by">
+        {SORT_MODES.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={sortMode === value}
+            onClick={() => setSortMode(value)}
+            disabled={value !== "votes" && !momentum}
+            title={value !== "votes" && !momentum ? "Loading…" : undefined}
+            className={
+              sortMode === value
+                ? "rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                : "rounded-full border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter by continent">
         {CONTINENTS.map((option) => (
           <button
@@ -233,6 +320,7 @@ export default function Leaderboard({
           const submitting = submittingIso === entry.isoCode;
           const voteLabel = submitting ? "Voting…" : votedHere ? "Voted" : "Vote";
           const isExpanded = expandedIso === entry.isoCode;
+          const change = rankChange24h(entry.isoCode);
 
           const toggleExpanded = () => {
             setExpandedIso((current) => (current === entry.isoCode ? null : entry.isoCode));
@@ -260,7 +348,16 @@ export default function Leaderboard({
                 }}
                 className="flex cursor-pointer items-center gap-3 p-4"
               >
-                <span className="w-6 shrink-0 text-right font-mono text-sm text-muted">{index + 1}</span>
+                <div className="flex w-11 shrink-0 flex-col items-end">
+                  <span className="font-mono text-sm text-muted">{index + 1}</span>
+                  {/* AŞAMA 4: 24h rank-change arrow — "Turkey ↑4, France ↓3". */}
+                  {change !== null && change !== 0 && (
+                    <span className={`font-mono text-[10px] ${change > 0 ? "text-success" : "text-danger"}`}>
+                      {change > 0 ? "↑" : "↓"}
+                      {Math.abs(change)}
+                    </span>
+                  )}
+                </div>
                 <Flag alpha2={entry.isoCode} width={32} />
                 <div className="min-w-0 flex-1">
                   {/* Country pages (AŞAMA 3) — links to the dedicated SEO

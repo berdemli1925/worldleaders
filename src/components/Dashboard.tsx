@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
+import type { SerializedMomentum } from "@/lib/momentum";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { mapThroneRow, type ThroneClaimHistoryEntry, type ThroneEntry, type ThroneRow } from "@/lib/throne";
 import { useVote } from "@/lib/use-vote";
+import ClosestBattles from "./ClosestBattles";
 import Hero from "./Hero";
 import Leaderboard, { type LeaderboardEntry } from "./Leaderboard";
 import LeaderTicker, { type TickerItem } from "./LeaderTicker";
@@ -168,6 +170,32 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     fetchThrones();
     thronesChannelRef.current?.send({ type: "broadcast", event: "throne-claimed", payload: {} });
   }, [fetchThrones]);
+
+  // AŞAMA 4 momentum data (24h/7d rank snapshots) — polled rather than
+  // pushed over realtime like votes/thrones above: it's derived from a full
+  // scan of this month's votes (see src/lib/momentum.ts), too heavy to
+  // recompute on every single vote broadcast, and "biggest climbers this
+  // week" doesn't need second-level freshness anyway.
+  const [momentum, setMomentum] = useState<SerializedMomentum | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/momentum");
+        const data = await res.json();
+        if (!cancelled && !data?.error) setMomentum(data);
+      } catch {
+        // Non-fatal — rank-change arrows/tabs just stay hidden until the
+        // next successful poll.
+      }
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   // Presence channel: every open tab tracks itself; the online count is just
   // the size of the resulting presence set. Ephemeral, not stored in Postgres.
@@ -364,6 +392,12 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
           </div>
         </div>
       </div>
+      <ClosestBattles
+        entries={entries}
+        submittingIso={submittingIso}
+        onVote={castVoteWithResult}
+        onSelectCountry={handleTickerSelect}
+      />
       <Leaderboard
         countries={countries}
         entries={entries}
@@ -379,6 +413,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         claimHistory={claimHistory}
         onThroneClaimed={handleThroneClaimed}
         onSelectCountry={handleSelectCountry}
+        momentum={momentum}
       />
       <LeaderTicker items={tickerItems} onSelect={handleTickerSelect} />
       {voteResult && <VoteResultModal result={voteResult} onClose={() => setVoteResult(null)} />}
