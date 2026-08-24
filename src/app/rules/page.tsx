@@ -38,12 +38,13 @@ export default function RulesPage() {
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold text-foreground">Starting scores</h2>
             <ul className="list-inside list-disc space-y-1">
-              <li>Every country begins the month with a <strong className="text-foreground">starting score</strong> between
-                50 and 300, so the map and leaderboard show real variation from the first vote rather than 250
-                identical, empty-looking countries.</li>
-              <li>Starting scores are assigned by a fixed formula based on each country&apos;s code — not by
-                population or any other real-world measure, so small countries don&apos;t start behind — and not
-                randomly: the same country always gets the same starting score.</li>
+              <li>Every country begins the month with a <strong className="text-foreground">starting score</strong>,
+                so the map and leaderboard show real variation from the first vote rather than 250 identical,
+                empty-looking countries.</li>
+              <li>Starting scores are a fixed, curated list, not a formula and never random — the same country
+                always gets the same starting score. They&apos;re not based on population; most countries start at
+                a flat, minimal baseline, with a curated set of countries starting higher to reflect where this
+                site&apos;s activity realistically concentrates.</li>
               <li>A country&apos;s rank is its <strong className="text-foreground">total power</strong>: starting
                 score plus real votes. The two are always shown separately — a starting score is never counted or
                 described as a vote.</li>
