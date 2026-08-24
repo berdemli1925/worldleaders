@@ -32,9 +32,17 @@ const VOTES_CHANNEL = "votes-updates";
 const THRONES_CHANNEL = "thrones-updates";
 const HIGHLIGHT_DURATION_MS = 2200;
 
-function nextUtcMidnight(from: number): number {
+// Bug fix: this used to compute next UTC *midnight* (the daily vote-limit
+// reset) while the TopBar box it feeds is labeled "Ranking resets in" —
+// the monthly ranking reset (1st of the month, UTC — see rules/page.tsx
+// and scripts/setup-monthly-archive.mjs's archive_and_reset_month cron).
+// Two different resets were being conflated under one label. This now
+// actually counts down to the next UTC month start; Date.UTC overflows
+// month 12 into next January on its own, so no explicit year-rollover
+// handling is needed.
+function nextUtcMonthStart(from: number): number {
   const d = new Date(from);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
 }
 
 export default function Dashboard({ countries, width, height, initialHighlightIso, guessCountryIso }: DashboardProps) {
@@ -286,7 +294,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
   // one, not flat until real votes accumulate.
   const maxPower = useMemo(() => Math.max(1, ...entries.map((entry) => entry.totalPower)), [entries]);
   const powerByIso = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.totalPower])), [entries]);
-  const resetTarget = useMemo(() => (now !== null ? nextUtcMidnight(now) : null), [now]);
+  const resetTarget = useMemo(() => (now !== null ? nextUtcMonthStart(now) : null), [now]);
   // `entries` is already sorted desc by total power (see toRankedEntries) —
   // rank is just its index. Shared by the hero ("Your country — ranked
   // #N") and the map's hover tooltip (see WorldMapInteractive).
