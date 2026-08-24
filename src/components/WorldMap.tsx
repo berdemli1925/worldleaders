@@ -85,10 +85,18 @@ const countryPaths: CountryPath[] = countryFeatures.map((country, index) => {
 interface WorldMapProps {
   /** ISO code to scroll-to and expand on mount — see page.tsx's ?country= handling. */
   initialHighlightIso?: string;
+  /** IP-based country guess for the hero — see src/lib/geo.ts. */
+  guessCountryIso?: string;
 }
 
-export default function WorldMap({ initialHighlightIso }: WorldMapProps) {
+export default function WorldMap({ initialHighlightIso, guessCountryIso }: WorldMapProps) {
   return (
-    <Dashboard countries={countryPaths} width={WIDTH} height={HEIGHT} initialHighlightIso={initialHighlightIso} />
+    <Dashboard
+      countries={countryPaths}
+      width={WIDTH}
+      height={HEIGHT}
+      initialHighlightIso={initialHighlightIso}
+      guessCountryIso={guessCountryIso}
+    />
   );
 }

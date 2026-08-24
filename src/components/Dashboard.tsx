@@ -6,6 +6,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { mapThroneRow, type ThroneClaimHistoryEntry, type ThroneEntry, type ThroneRow } from "@/lib/throne";
 import { useVote } from "@/lib/use-vote";
+import Hero from "./Hero";
 import Leaderboard, { type LeaderboardEntry } from "./Leaderboard";
 import LeaderTicker, { type TickerItem } from "./LeaderTicker";
 import TopBar from "./TopBar";
@@ -18,6 +19,8 @@ interface DashboardProps {
   height: number;
   /** ISO code to scroll-to and expand once the leaderboard has loaded — see WorldMap.tsx. */
   initialHighlightIso?: string;
+  /** IP-based country guess for the hero's "Your country" line — see src/lib/geo.ts. */
+  guessCountryIso?: string;
 }
 
 const VOTES_CHANNEL = "votes-updates";
@@ -30,7 +33,7 @@ function nextUtcMidnight(from: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 }
 
-export default function Dashboard({ countries, width, height, initialHighlightIso }: DashboardProps) {
+export default function Dashboard({ countries, width, height, initialHighlightIso, guessCountryIso }: DashboardProps) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [allTimeEntries, setAllTimeEntries] = useState<LeaderboardEntry[]>([]);
   const [thrones, setThrones] = useState<ThroneEntry[]>([]);
@@ -203,6 +206,10 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
   const maxVotes = useMemo(() => Math.max(1, ...entries.map((entry) => entry.voteCount)), [entries]);
   const voteCounts = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.voteCount])), [entries]);
   const resetTarget = useMemo(() => (now !== null ? nextUtcMidnight(now) : null), [now]);
+  // `entries` is already sorted desc by vote count (see fetchRanking) — rank
+  // is just its index. Shared by the hero ("Your country — ranked #N") and
+  // the map's hover tooltip (see WorldMapInteractive).
+  const rankByIso = useMemo(() => new Map(entries.map((entry, index) => [entry.isoCode, index + 1])), [entries]);
 
   const countryNameByIso = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.name])), [entries]);
 
@@ -254,24 +261,43 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
   return (
     <div className="flex w-full flex-col gap-6 pb-16">
       {turnstileSiteKey && <TurnstileWidget ref={turnstileRef} siteKey={turnstileSiteKey} />}
-      <TopBar totalVotes={totalVotes} onlineCount={onlineCount} resetTarget={resetTarget} now={now} />
-      <div className="w-full rounded-2xl border border-border bg-surface p-4">
-        <WorldMapInteractive
-          ref={mapRef}
-          countries={countries}
-          width={width}
-          height={height}
-          voteCounts={voteCounts}
-          maxVotes={maxVotes}
+      {/* Hero + map: stacked on mobile (hero first, so the vote CTA is above
+          the fold with no scrolling — see gelistirme-plani-v2.md AŞAMA 1),
+          side by side from the lg breakpoint up. */}
+      <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-stretch">
+        <Hero
+          leader={entries[0]}
+          runnerUp={entries[1]}
+          rankByIso={rankByIso}
+          entries={entries}
+          serverGuessIso={guessCountryIso}
           voteStatus={voteStatus}
           submittingIso={submittingIso}
-          voteError={voteError}
           onVote={castVote}
-          thrones={thrones}
-          claimHistory={claimHistory}
-          now={now}
-          onThroneClaimed={handleThroneClaimed}
+          onSelectCountry={handleTickerSelect}
         />
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <TopBar totalVotes={totalVotes} onlineCount={onlineCount} resetTarget={resetTarget} now={now} />
+          <div className="w-full rounded-2xl border border-border bg-surface p-4">
+            <WorldMapInteractive
+              ref={mapRef}
+              countries={countries}
+              width={width}
+              height={height}
+              voteCounts={voteCounts}
+              maxVotes={maxVotes}
+              rankByIso={rankByIso}
+              voteStatus={voteStatus}
+              submittingIso={submittingIso}
+              voteError={voteError}
+              onVote={castVote}
+              thrones={thrones}
+              claimHistory={claimHistory}
+              now={now}
+              onThroneClaimed={handleThroneClaimed}
+            />
+          </div>
+        </div>
       </div>
       <Leaderboard
         countries={countries}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { getCountryMeta } from "@/lib/country-meta";
+import { getGeoCountryIso } from "@/lib/geo";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { LogoMark } from "@/components/Logo";
 import WorldMap from "@/components/WorldMap";
@@ -45,23 +46,24 @@ export async function generateMetadata({ searchParams }: PageProps<"/">): Promis
 export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
   const countryParam = typeof params.country === "string" ? params.country.toUpperCase() : undefined;
+  const guessCountryIso = await getGeoCountryIso();
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-8 sm:py-12">
-      <main className="flex w-full max-w-4xl flex-col items-center gap-6">
-        <div className="flex flex-col items-center gap-2 text-center">
+    <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-6 sm:py-10">
+      {/* max-w-6xl (up from 4xl) — the hero+map row and the now-much-larger
+          map (see WorldMapInteractive/AŞAMA 1.5) both need the extra width;
+          the leaderboard below still reads fine at this width. */}
+      <main className="flex w-full max-w-6xl flex-col items-center gap-6">
+        <div className="flex flex-col items-center gap-1.5 text-center">
           <h1 className="flex items-center gap-3 text-foreground">
-            <LogoMark className="h-9 w-9 shrink-0 sm:h-11 sm:w-11" />
-            <span className="flex items-baseline gap-2 whitespace-nowrap text-3xl uppercase tracking-tight sm:text-4xl">
+            <LogoMark className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" />
+            <span className="flex items-baseline gap-2 whitespace-nowrap text-xl uppercase tracking-tight sm:text-2xl">
               <span className="text-[0.94em] font-normal tracking-[0.02em] text-muted">World</span>
               <span className="font-bold tracking-[0.005em]">Leaders</span>
             </span>
           </h1>
-          <p className="max-w-xl text-sm text-muted">
-            Vote for your country, watch the ranking shift, and see who&apos;s currently sitting on the throne.
-          </p>
         </div>
-        <WorldMap initialHighlightIso={countryParam} />
+        <WorldMap initialHighlightIso={countryParam} guessCountryIso={guessCountryIso} />
       </main>
     </div>
   );

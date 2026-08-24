@@ -30,6 +30,8 @@ interface WorldMapInteractiveProps {
   voteCounts: Map<string, number>;
   /** Highest count across all countries — the top of the color scale. */
   maxVotes: number;
+  /** This month's rank (1-based) keyed by ISO alpha-2 code — shown in the hover tooltip. */
+  rankByIso: Map<string, number>;
   /** Global "have I voted today, and for which country" — shared with the leaderboard. */
   voteStatus: MyVoteStatus | null;
   /** ISO code of the vote currently being submitted, if any. */
@@ -142,6 +144,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
     height,
     voteCounts,
     maxVotes,
+    rankByIso,
     voteStatus,
     submittingIso,
     voteError,
@@ -469,11 +472,15 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
         be selected with Enter or Space.
       </p>
       <div className="flex w-full flex-col gap-4 sm:flex-row">
-        <div className="relative min-w-0 flex-1 overflow-hidden rounded-lg bg-black/20">
+        {/* The map is the site's identity (AŞAMA 1.5) — big on every
+            breakpoint, and a near-black sea so land colors (see
+            vote-color-scale.ts) read clearly against it instead of blending
+            into a merely-dim background. */}
+        <div className="relative h-[54vh] min-w-0 flex-1 overflow-hidden rounded-lg bg-[#040508] sm:h-[60vh] lg:h-[70vh]">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${width} ${height}`}
-            className="h-auto w-full touch-none select-none"
+            className="h-full w-full touch-none select-none"
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -558,8 +565,11 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                           height={rect ? rect.height : boxHeight}
                           preserveAspectRatio={rect ? "none" : "xMidYMid slice"}
                         />
-                        {/* Light darkening so the (redrawn, on-top) border and hover tooltip name stay readable. */}
-                        <rect x={x0} y={y0} width={boxWidth} height={boxHeight} fill="black" fillOpacity={0.35} />
+                        {/* Just enough darkening that the (redrawn, on-top)
+                            border and hover tooltip name stay readable —
+                            AŞAMA 1.5 asks for leader images to read clearly,
+                            not be dimmed like before. */}
+                        <rect x={x0} y={y0} width={boxWidth} height={boxHeight} fill="black" fillOpacity={0.12} />
                       </g>
                     );
                   })}
@@ -571,6 +581,23 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                       fill="none"
                       className="stroke-accent"
                       strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  ))}
+
+                  {/* Avatar-only leadered countries (too small on screen for
+                      the full post image) still get their border
+                      emphasized, same as image countries above — AŞAMA 1.5:
+                      "Lideri olan ülkelerin sınırları vurgu rengiyle
+                      belirginleşsin," not just the large ones. */}
+                  {leaderLayers.avatars.map(({ country }) => (
+                    <path
+                      key={`border-avatar-${country.id}`}
+                      d={country.d}
+                      fill="none"
+                      className="stroke-accent"
+                      strokeWidth={1}
                       vectorEffect="non-scaling-stroke"
                       pointerEvents="none"
                     />
@@ -622,14 +649,30 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
               ⟲
             </button>
           </div>
-          {hoveredCountry && (
-            <div
-              className="pointer-events-none fixed z-50 -translate-y-full rounded-md border border-border bg-surface px-2 py-1 text-xs font-medium text-foreground shadow-md"
-              style={{ left: (hover?.x ?? 0) + 12, top: (hover?.y ?? 0) - 10 }}
-            >
-              {hoveredCountry.name}
-            </div>
-          )}
+          {hoveredCountry &&
+            (() => {
+              const iso = hoveredCountry.alpha2;
+              const rank = iso ? rankByIso.get(iso) : undefined;
+              const votes = iso ? (voteCounts.get(iso) ?? 0) : 0;
+              const throne = iso ? throneByIso.get(iso) : undefined;
+              return (
+                <div
+                  className="pointer-events-none fixed z-50 -translate-y-full rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs shadow-md"
+                  style={{ left: (hover?.x ?? 0) + 12, top: (hover?.y ?? 0) - 10 }}
+                >
+                  <p className="font-medium text-foreground">{hoveredCountry.name}</p>
+                  {iso && (
+                    <p className="mt-0.5 flex items-center gap-1.5 font-mono text-muted-2">
+                      {rank && <span>#{rank}</span>}
+                      <span>
+                        {votes.toLocaleString("en-US")} vote{votes === 1 ? "" : "s"}
+                      </span>
+                    </p>
+                  )}
+                  {throne?.handle && <p className="mt-0.5 text-accent">@{throne.handle}</p>}
+                </div>
+              );
+            })()}
         </div>
         {selectedCountry && (
           <aside className="w-full shrink-0 border-t border-border pt-4 sm:w-64 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
