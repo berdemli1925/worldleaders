@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
 
@@ -23,9 +24,9 @@ export default function AboutPage() {
               World Leaders is an interactive world map where every country competes by vote. Anyone can vote for
               free, once a day, for their favorite country. Countries with the most votes rise to the top of the
               monthly ranking — see the &quot;This month,&quot; &quot;All time,&quot; and{" "}
-              <a href="/champions" className="text-accent hover:underline">
+              <Link href="/champions" className="text-accent hover:underline">
                 Champions
-              </a>{" "}
+              </Link>{" "}
               tabs for the different views on that.
             </p>
           </section>
@@ -52,9 +53,9 @@ export default function AboutPage() {
                 </>
               )}{" "}
               Full details are on the{" "}
-              <a href="/rules" className="text-accent hover:underline">
+              <Link href="/rules" className="text-accent hover:underline">
                 Rules
-              </a>{" "}
+              </Link>{" "}
               page.
             </p>
           </section>

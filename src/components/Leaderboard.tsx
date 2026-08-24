@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
+import { getSlugForCountry } from "@/lib/country-slug";
 import { buildShareText, countryShareUrl, openShareWindow, xIntentUrl } from "@/lib/share";
 import { isVacant, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
@@ -261,7 +263,15 @@ export default function Leaderboard({
                 <span className="w-6 shrink-0 text-right font-mono text-sm text-muted">{index + 1}</span>
                 <Flag alpha2={entry.isoCode} width={32} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-foreground">{entry.name}</p>
+                  {/* Country pages (AŞAMA 3) — links to the dedicated SEO
+                      page, not the accordion toggle, hence stopPropagation. */}
+                  <Link
+                    href={`/${getSlugForCountry(entry.isoCode) ?? entry.isoCode.toLowerCase()}`}
+                    onClick={(event) => event.stopPropagation()}
+                    className="block truncate font-medium text-foreground hover:text-accent hover:underline"
+                  >
+                    {entry.name}
+                  </Link>
                   <p className="truncate text-xs text-muted-2">{meta?.capital ?? "Unknown capital"}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
