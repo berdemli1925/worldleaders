@@ -10,6 +10,9 @@ export interface ActiveLeader {
   claimId: number;
   handle: string;
   brandTitle: string | null;
+  description: string | null;
+  logoUrl: string | null;
+  linkUrl: string | null;
   postText: string | null;
   amountPaid: number;
   currentValue: number;
@@ -76,6 +79,81 @@ function statusClasses(status: PaymentRow["status"]): string {
   return "bg-surface-hover text-muted";
 }
 
+const inputClasses =
+  "rounded-sm border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-accent";
+
+// Direct request: "her şeye müdahale edilebilir olsun kolayca" — a way to
+// fix a claim's content in place (typo, a broken logo link, toning down a
+// description) instead of the only lever being "remove entirely" below.
+// Local, uncontrolled-from-parent state: opens pre-filled from the current
+// claim, and only the fields actually changed are sent (see
+// /api/admin/claims/[id]/edit — undefined fields are left alone server-side
+// too), so leaving three fields untouched and fixing one doesn't blank the
+// other three.
+function EditClaimForm({
+  leader,
+  onSave,
+  onCancel,
+  busy,
+}: {
+  leader: ActiveLeader;
+  onSave: (fields: { brandTitle: string; description: string; logoUrl: string; linkUrl: string }) => void;
+  onCancel: () => void;
+  busy: boolean;
+}) {
+  const [brandTitle, setBrandTitle] = useState(leader.brandTitle ?? "");
+  const [description, setDescription] = useState(leader.description ?? "");
+  const [logoUrl, setLogoUrl] = useState(leader.logoUrl ?? "");
+  const [linkUrl, setLinkUrl] = useState(leader.linkUrl ?? "");
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+      <input
+        value={brandTitle}
+        onChange={(event) => setBrandTitle(event.target.value)}
+        placeholder="Brand / title"
+        className={inputClasses}
+      />
+      <textarea
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+        placeholder="Description"
+        rows={2}
+        className={`${inputClasses} resize-none`}
+      />
+      <input
+        value={logoUrl}
+        onChange={(event) => setLogoUrl(event.target.value)}
+        placeholder="Logo image URL"
+        className={inputClasses}
+      />
+      <input
+        value={linkUrl}
+        onChange={(event) => setLinkUrl(event.target.value)}
+        placeholder="Link URL"
+        className={inputClasses}
+      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onSave({ brandTitle, description, logoUrl, linkUrl })}
+          className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-60 ${CTA_CLASSES}`}
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-sm border border-border px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-hover"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard({
   activeLeaders,
   moderationReports,
@@ -88,12 +166,28 @@ export default function AdminDashboard({
   const [error, setError] = useState<string | null>(null);
   const [blockHandleInput, setBlockHandleInput] = useState("");
   const [blockReasonInput, setBlockReasonInput] = useState("");
+  const [editingClaimId, setEditingClaimId] = useState<number | null>(null);
+  const [priceCountryInput, setPriceCountryInput] = useState("");
+  const [priceValueInput, setPriceValueInput] = useState("");
 
   async function run(key: string, url: string, body?: unknown) {
     setBusy(key);
     setError(null);
     const result = await post(url, body);
     if (!result.ok) setError(result.error ?? "Something went wrong.");
+    setBusy(null);
+    router.refresh();
+  }
+
+  async function runAnd(key: string, url: string, body: unknown, after: () => void) {
+    setBusy(key);
+    setError(null);
+    const result = await post(url, body);
+    if (!result.ok) {
+      setError(result.error ?? "Something went wrong.");
+    } else {
+      after();
+    }
     setBusy(null);
     router.refresh();
   }
@@ -126,6 +220,41 @@ export default function AdminDashboard({
       {error && <p className="text-sm text-danger">{error}</p>}
 
       <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold text-foreground">Set a country&apos;s base price</h2>
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface p-4">
+          <input
+            value={priceCountryInput}
+            onChange={(event) => setPriceCountryInput(event.target.value)}
+            placeholder="ISO code (e.g. TR)"
+            maxLength={2}
+            className={`${inputClasses} w-32 uppercase`}
+          />
+          <input
+            value={priceValueInput}
+            onChange={(event) => setPriceValueInput(event.target.value)}
+            placeholder="Base price ($)"
+            inputMode="decimal"
+            className={`${inputClasses} w-36`}
+          />
+          <button
+            type="button"
+            disabled={!priceCountryInput.trim() || !priceValueInput.trim() || busy === "set-base-price"}
+            onClick={() =>
+              runAnd(
+                "set-base-price",
+                `/api/admin/thrones/${priceCountryInput.trim()}/set-base-price`,
+                { basePrice: Number(priceValueInput) },
+                () => setPriceValueInput(""),
+              )
+            }
+            className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-60 ${CTA_CLASSES}`}
+          >
+            Set price
+          </button>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold text-foreground">Active leaders ({activeLeaders.length})</h2>
         {activeLeaders.length === 0 && <p className="text-sm text-muted">No active leaders.</p>}
         <div className="flex flex-col gap-3">
@@ -144,6 +273,13 @@ export default function AdminDashboard({
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingClaimId((current) => (current === leader.claimId ? null : leader.claimId))}
+                    className="rounded-sm border border-border px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-hover"
+                  >
+                    {editingClaimId === leader.claimId ? "Close" : "Edit"}
+                  </button>
                   <button
                     type="button"
                     disabled={busy === `remove-${leader.claimId}`}
@@ -166,6 +302,18 @@ export default function AdminDashboard({
                   </button>
                 </div>
               </div>
+              {editingClaimId === leader.claimId && (
+                <EditClaimForm
+                  leader={leader}
+                  busy={busy === `edit-${leader.claimId}`}
+                  onCancel={() => setEditingClaimId(null)}
+                  onSave={(fields) =>
+                    runAnd(`edit-${leader.claimId}`, `/api/admin/claims/${leader.claimId}/edit`, fields, () =>
+                      setEditingClaimId(null),
+                    )
+                  }
+                />
+              )}
             </div>
           ))}
         </div>
@@ -221,14 +369,14 @@ export default function AdminDashboard({
             value={blockHandleInput}
             onChange={(event) => setBlockHandleInput(event.target.value)}
             placeholder="@handle"
-            className="flex-1 rounded-sm border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-accent"
+            className={`flex-1 ${inputClasses}`}
           />
           <input
             type="text"
             value={blockReasonInput}
             onChange={(event) => setBlockReasonInput(event.target.value)}
             placeholder="Reason (optional)"
-            className="flex-1 rounded-sm border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-accent"
+            className={`flex-1 ${inputClasses}`}
           />
           <button
             type="button"

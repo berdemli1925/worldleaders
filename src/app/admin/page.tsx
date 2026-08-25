@@ -53,7 +53,7 @@ async function loadAdminData() {
     claimIds.length > 0
       ? await supabaseAdmin
           .from("throne_claims")
-          .select("id, x_handle, amount_paid, brand_title, post_text, removed_at")
+          .select("id, x_handle, amount_paid, brand_title, description, logo_url, link_url, post_text, removed_at")
           .in("id", claimIds)
       : { data: [] };
   const claimById = new Map((claims ?? []).map((c) => [c.id, c]));
@@ -71,6 +71,9 @@ async function loadAdminData() {
         claimId: claim.id as number,
         handle: claim.x_handle as string,
         brandTitle: claim.brand_title as string | null,
+        description: claim.description as string | null,
+        logoUrl: claim.logo_url as string | null,
+        linkUrl: claim.link_url as string | null,
         postText: claim.post_text as string | null,
         amountPaid: claim.amount_paid as number,
         currentValue: t.current_value as number,

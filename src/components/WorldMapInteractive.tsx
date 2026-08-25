@@ -743,6 +743,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                 <div className="mt-2 border-t border-border pt-4">
                   <ThronePanel
                     isoCode={voteIsoCode}
+                    countryName={selectedCountry.name}
                     throne={throneByIso.get(voteIsoCode)}
                     claimHistory={claimHistory}
                     now={now}

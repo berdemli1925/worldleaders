@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
 import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import ClaimThroneButton from "./ClaimThroneButton";
@@ -10,6 +12,7 @@ import ReportButton from "./ReportButton";
 
 interface ThronePanelProps {
   isoCode: string;
+  countryName: string;
   throne: ThroneEntry | undefined;
   /** Full claim history across all countries — filtered to this one internally. */
   claimHistory: ThroneClaimHistoryEntry[];
@@ -33,14 +36,34 @@ function formatPastAmount(amount: number): string {
 // the leaderboard's expandable cards (Leaderboard.tsx) and the map's
 // country side panel (WorldMapInteractive.tsx) so both show the exact same
 // leader info/claim button instead of two copies drifting apart.
-export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpenClaim }: ThronePanelProps) {
+//
+// Direct request: match memleket.lol's "[City] Ağası" nested card —
+// a distinctly bordered box labeled with a crown + country name, a square
+// brand icon next to bold name + truncated description, price and the
+// takeover button on one row, and a "previous leaders" section that shows
+// just the most recent one collapsed with a "Show all (N)" toggle rather
+// than a wall of chips.
+export default function ThronePanel({ isoCode, countryName, throne, claimHistory, now, onOpenClaim }: ThronePanelProps) {
   const hasLeader = !isVacant(throne);
   const pastClaims = claimHistory.filter((claim) => claim.isoCode === isoCode && claim.id !== throne?.currentClaimId);
-  const visibleHistory = pastClaims.slice(0, 5);
-  const extraHistory = pastClaims.length - visibleHistory.length;
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const visiblePastClaims = historyExpanded ? pastClaims : pastClaims.slice(0, 1);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 border-2 border-cta-border/50 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-cta-border">
+          <span aria-hidden="true">👑</span>
+          {countryName} Throne
+        </p>
+        {hasLeader && throne && (
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wide text-muted-2">Reign ends in</p>
+            <CountdownTimer target={throne.cycleEnd ?? 0} now={now} className="font-mono text-xs text-foreground" />
+          </div>
+        )}
+      </div>
+
       {hasLeader && throne ? (
         <>
           {throne.postImageUrl && (
@@ -51,19 +74,21 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
               scale={throne.postImageScale}
               offsetX={throne.postImageOffsetX}
               offsetY={throne.postImageOffsetY}
-              className="h-56 w-full rounded-md"
+              className="h-56 w-full rounded-sm"
             />
           )}
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col gap-1.5">
-              {/* Leader — who's claiming, kept visually separate from the
-                  post content below since they can be different people
-                  (see LeaderIdentityBadges.tsx). */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                {throne.logoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={throne.logoUrl} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
-                )}
+
+          {/* Brand row — square logo (not a circular avatar; deliberately
+              matches the memleket.lol reference's icon shape) + bold
+              name + truncated description, the way a sponsor card reads
+              at a glance rather than a personal profile. */}
+          <div className="flex items-start gap-2.5">
+            {throne.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={throne.logoUrl} alt="" className="h-10 w-10 shrink-0 rounded-sm object-cover" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <LeaderIdentityBadges
                   xUrl={throne.leaderXUrl}
                   instagramUrl={throne.leaderInstagramUrl}
@@ -71,52 +96,51 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
                   facebookUrl={throne.leaderFacebookUrl}
                   brandTitle={throne.brandTitle}
                 />
-                {PAYMENTS_ENABLED ? (
-                  <>
-                    <span className="text-muted-2">paid</span>
-                    <span className="font-mono font-medium text-accent">{formatMoney(throne.currentValue ?? 0)}</span>
-                  </>
-                ) : (
+                {!PAYMENTS_ENABLED && (
                   <span className="rounded-sm bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
                     Free (beta)
                   </span>
                 )}
                 <ReportButton throneClaimId={throne.currentClaimId ?? 0} compact />
               </div>
-              {/* Content — the linked X post, shown separately since it
-                  isn't necessarily the leader's own post. */}
-              {throne.postText && (
-                <div className="flex flex-col gap-0.5">
+              {throne.description ? (
+                <p className="line-clamp-2 text-xs text-muted">{throne.description}</p>
+              ) : throne.postText ? (
+                <p className="line-clamp-2 text-xs italic text-muted">&ldquo;{throne.postText}&rdquo;</p>
+              ) : null}
+              {!throne.leaderXUrl &&
+                !throne.leaderInstagramUrl &&
+                !throne.leaderTiktokUrl &&
+                !throne.leaderFacebookUrl &&
+                throne.linkUrl && (
                   <a
-                    href={`https://x.com/${throne.handle}`}
+                    href={throne.linkUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[11px] text-muted-2 hover:text-accent"
+                    className="truncate text-xs text-muted-2 hover:text-accent"
                   >
-                    Post shown via @{throne.handle} on X
+                    {throne.linkUrl}
                   </a>
-                  <p className="border-l-2 border-border pl-2 text-xs italic text-muted">&ldquo;{throne.postText}&rdquo;</p>
-                </div>
-              )}
-              {throne.description && <p className="text-xs text-muted">{throne.description}</p>}
-              {!throne.leaderXUrl && !throne.leaderInstagramUrl && !throne.leaderTiktokUrl && !throne.leaderFacebookUrl && throne.linkUrl && (
+                )}
+              {throne.postText && (
                 <a
-                  href={throne.linkUrl}
+                  href={`https://x.com/${throne.handle}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="truncate text-xs text-muted-2 hover:text-accent"
+                  className="block text-[11px] text-muted-2 hover:text-accent"
                 >
-                  {throne.linkUrl}
+                  Post shown via @{throne.handle} on X
                 </a>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-[11px] text-muted-2">Reign ends in</p>
-                <CountdownTimer target={throne.cycleEnd ?? 0} now={now} className="font-mono text-sm text-foreground" />
-              </div>
-              <ClaimThroneButton throne={throne} onOpenClaim={onOpenClaim} className="px-4 py-2 text-xs sm:text-sm" />
-            </div>
+          </div>
+
+          {/* Price + takeover — the memleket-style "$103 · Devral $104" row. */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="border border-border px-3 py-1.5 font-mono text-sm text-foreground">
+              {formatMoney(throne.currentValue ?? 0)}
+            </span>
+            <ClaimThroneButton throne={throne} onOpenClaim={onOpenClaim} className="px-4 py-2 text-xs sm:text-sm" />
           </div>
         </>
       ) : (
@@ -133,14 +157,24 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
         </div>
       )}
 
-      {visibleHistory.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {visibleHistory.map((past) => (
-            <span key={past.id} className="rounded-sm bg-white/5 px-2 py-1 text-[11px] text-muted">
-              @{past.handle} · {formatPastAmount(past.amountPaid)}
-            </span>
+      {pastClaims.length > 0 && (
+        <div className="flex flex-col gap-1 border-t border-border pt-2">
+          <p className="text-[10px] uppercase tracking-wide text-muted-2">Previous leaders</p>
+          {visiblePastClaims.map((past) => (
+            <p key={past.id} className="flex items-center justify-between text-xs text-muted">
+              <span>@{past.handle}</span>
+              <span className="font-mono">{formatPastAmount(past.amountPaid)}</span>
+            </p>
           ))}
-          {extraHistory > 0 && <span className="px-1 text-[11px] text-muted-2">History (+{extraHistory})</span>}
+          {!historyExpanded && pastClaims.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setHistoryExpanded(true)}
+              className="self-start text-[11px] text-accent hover:underline"
+            >
+              Show all ({pastClaims.length})
+            </button>
+          )}
         </div>
       )}
     </div>
