@@ -1,7 +1,8 @@
 "use client";
 
-import { BETA_HOLD_HOURS, PAYMENTS_ENABLED } from "@/lib/beta-mode";
+import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
 import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
+import ClaimThroneButton from "./ClaimThroneButton";
 import CountdownTimer from "./CountdownTimer";
 import CroppedLeaderImage from "./CroppedLeaderImage";
 import LeaderIdentityBadges from "./LeaderIdentityBadges";
@@ -114,22 +115,7 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
                 <p className="text-[11px] text-muted-2">Reign ends in</p>
                 <CountdownTimer target={throne.cycleEnd ?? 0} now={now} className="font-mono text-sm text-foreground" />
               </div>
-              {PAYMENTS_ENABLED ? (
-                <button
-                  type="button"
-                  onClick={onOpenClaim}
-                  className="rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
-                >
-                  Take the throne ({formatMoney(requiredMinimum(throne))})
-                </button>
-              ) : (
-                <span
-                  className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-2"
-                  title="No takeovers during the free beta"
-                >
-                  Held up to {BETA_HOLD_HOURS}h
-                </span>
-              )}
+              <ClaimThroneButton throne={throne} onOpenClaim={onOpenClaim} className="px-4 py-2 text-xs sm:text-sm" />
             </div>
           </div>
         </>
@@ -143,13 +129,7 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
               <span className="font-medium text-accent">Free during beta</span>
             </p>
           )}
-          <button
-            type="button"
-            onClick={onOpenClaim}
-            className="rounded-full bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/25"
-          >
-            {PAYMENTS_ENABLED ? `Claim this country (${formatMoney(requiredMinimum(throne))})` : "Claim this country — free"}
-          </button>
+          <ClaimThroneButton throne={throne} onOpenClaim={onOpenClaim} />
         </div>
       )}
 
