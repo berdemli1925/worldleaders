@@ -486,7 +486,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
         Scroll or pinch to zoom, drag to pan. Each country is focusable and can
         be selected with Enter or Space.
       </p>
-      <div className="flex w-full flex-col gap-4 sm:flex-row">
+      <div className="flex w-full flex-col gap-4 lg:flex-row">
         {/* The map is the site's identity — near-fullscreen on every
             breakpoint (direct request/memleket.lol-style: title bar on top,
             map dominates everything below it), and a near-black sea so
@@ -712,7 +712,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
             })()}
         </div>
         {selectedCountry && (
-          <aside className="w-full shrink-0 border-t border-border pt-4 sm:w-64 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+          <aside className="w-full shrink-0 border-t border-border pt-4 lg:w-64 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
             <div className="flex items-start justify-between gap-2">
               <h2 className="text-lg font-semibold text-foreground">{selectedCountry.name}</h2>
               <button
