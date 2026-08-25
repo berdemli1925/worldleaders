@@ -480,11 +480,12 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
         be selected with Enter or Space.
       </p>
       <div className="flex w-full flex-col gap-4 sm:flex-row">
-        {/* The map is the site's identity (AŞAMA 1.5) — big on every
-            breakpoint, and a near-black sea so land colors (see
-            vote-color-scale.ts) read clearly against it instead of blending
-            into a merely-dim background. */}
-        <div className="relative h-[54vh] min-w-0 flex-1 overflow-hidden rounded-lg bg-[#040508] sm:h-[60vh] lg:h-[70vh]">
+        {/* The map is the site's identity — near-fullscreen on every
+            breakpoint (direct request/memleket.lol-style: title bar on top,
+            map dominates everything below it), and a near-black sea so
+            land colors (see vote-color-scale.ts) read clearly against it
+            instead of blending into a merely-dim background. */}
+        <div className="relative h-[62vh] min-w-0 flex-1 overflow-hidden rounded-lg bg-[#040508] sm:h-[75vh] lg:h-[88vh]">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${width} ${height}`}

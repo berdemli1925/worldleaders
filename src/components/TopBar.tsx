@@ -2,7 +2,6 @@ import CountdownTimer from "./CountdownTimer";
 
 interface TopBarProps {
   totalVotes: number;
-  votesToday: number;
   resetTarget: number | null;
   now: number | null;
 }
@@ -16,24 +15,14 @@ function StatBox({ label, value, mono }: { label: string; value: React.ReactNode
   );
 }
 
-// AŞAMA 6: "Online now" (a presence count that reads as dead when it's
-// low — exactly the moments a pre-launch/early site is in most) is gone,
-// replaced by "Votes today" — an activity number that's honest at any
-// traffic level and only ever goes up over the course of a day.
-export default function TopBar({ totalVotes, votesToday, resetTarget, now }: TopBarProps) {
+// "Votes today" removed on direct request — kept for one iteration (AŞAMA
+// 6) as the replacement for "Online now," but ended up redundant next to
+// LiveFeed's live activity list right below the map, which already shows
+// recent votes as they happen.
+export default function TopBar({ totalVotes, resetTarget, now }: TopBarProps) {
   return (
     <div className="flex w-full flex-col gap-3 sm:flex-row">
       <StatBox label="Total votes" value={totalVotes.toLocaleString("en-US")} mono />
-      <StatBox
-        label="Votes today"
-        mono
-        value={
-          <span className="flex items-center gap-2">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-success" aria-hidden="true" />
-            {votesToday.toLocaleString("en-US")}
-          </span>
-        }
-      />
       <StatBox
         label="Ranking resets in"
         mono

@@ -417,44 +417,48 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
   return (
     <div className="flex w-full flex-col gap-6 pb-16">
       {turnstileSiteKey && <TurnstileWidget ref={turnstileRef} siteKey={turnstileSiteKey} />}
-      {/* Hero + map: stacked on mobile (hero first, so the vote CTA is above
-          the fold with no scrolling — see gelistirme-plani-v2.md AŞAMA 1),
-          side by side from the lg breakpoint up. */}
-      <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-stretch">
-        <Hero
-          leader={entries[0]}
-          runnerUp={entries[1]}
+      {/* Hero on top (compact, full width — the "who's winning" + "claim its
+          throne" banner), map filling almost the rest of the screen right
+          below it — direct request, and how memleket.lol (this site's
+          stated inspiration) does it too: title bar, then a map that
+          dominates. See gelistirme-plani-v2.md AŞAMA 1/1.5 for the
+          original sizing, since raised further. */}
+      <Hero
+        leader={entries[0]}
+        runnerUp={entries[1]}
+        rankByIso={rankByIso}
+        entries={entries}
+        serverGuessIso={guessCountryIso}
+        voteStatus={voteStatus}
+        submittingIso={submittingIso}
+        onVote={castVoteWithResult}
+        onSelectCountry={handleTickerSelect}
+        countries={countries}
+        thrones={thrones}
+        claimHistory={claimHistory}
+        now={now}
+        onThroneClaimed={handleThroneClaimed}
+      />
+      <TopBar totalVotes={totalVotes} resetTarget={resetTarget} now={now} />
+      <div className="w-full rounded-2xl border border-border bg-surface p-4">
+        <WorldMapInteractive
+          ref={mapRef}
+          countries={countries}
+          width={width}
+          height={height}
+          voteCounts={voteCounts}
+          maxVotes={maxVotes}
           rankByIso={rankByIso}
-          entries={entries}
-          serverGuessIso={guessCountryIso}
+          leaderIso={entries[0]?.isoCode}
           voteStatus={voteStatus}
           submittingIso={submittingIso}
+          voteError={voteError}
           onVote={castVoteWithResult}
-          onSelectCountry={handleTickerSelect}
+          thrones={thrones}
+          claimHistory={claimHistory}
+          now={now}
+          onThroneClaimed={handleThroneClaimed}
         />
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <TopBar totalVotes={totalVotes} votesToday={momentum?.votesToday ?? 0} resetTarget={resetTarget} now={now} />
-          <div className="w-full rounded-2xl border border-border bg-surface p-4">
-            <WorldMapInteractive
-              ref={mapRef}
-              countries={countries}
-              width={width}
-              height={height}
-              voteCounts={voteCounts}
-              maxVotes={maxVotes}
-              rankByIso={rankByIso}
-              leaderIso={entries[0]?.isoCode}
-              voteStatus={voteStatus}
-              submittingIso={submittingIso}
-              voteError={voteError}
-              onVote={castVoteWithResult}
-              thrones={thrones}
-              claimHistory={claimHistory}
-              now={now}
-              onThroneClaimed={handleThroneClaimed}
-            />
-          </div>
-        </div>
       </div>
       <ClosestBattles
         entries={entries}

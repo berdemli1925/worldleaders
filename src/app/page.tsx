@@ -47,10 +47,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-6 sm:py-10">
-      {/* max-w-6xl (up from 4xl) — the hero+map row and the now-much-larger
-          map (see WorldMapInteractive/AŞAMA 1.5) both need the extra width;
-          the leaderboard below still reads fine at this width. */}
-      <main className="flex w-full max-w-6xl flex-col items-center gap-6">
+      {/* max-w-7xl — the map is meant to almost fill the screen (direct
+          request), and the leaderboard grid below still reads fine at this
+          width. */}
+      <main className="flex w-full max-w-7xl flex-col items-center gap-6">
         <div className="flex flex-col items-center gap-1.5 text-center">
           <h1 className="flex items-center gap-3 text-foreground">
             <LogoMark className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" />
