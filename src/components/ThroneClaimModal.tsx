@@ -307,6 +307,10 @@ export default function ThroneClaimModal({
                   the leader's own. */}
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-medium text-foreground">Content</p>
+                <p className="text-xs text-muted-2">
+                  No direct photo upload — your image comes from a real X post. Post it (or find a public one you
+                  want to use) and link it below; if it has a photo, you&apos;ll be able to position it on the map next.
+                </p>
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="text-muted">X post to display — required, any public post</span>
                   <input

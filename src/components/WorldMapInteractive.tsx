@@ -5,7 +5,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { computeImageRect, DEFAULT_IMAGE_CROP } from "@/lib/image-crop";
 import { twitterImageVariant } from "@/lib/twitter-image";
-import { voteCountToColor } from "@/lib/vote-color-scale";
+import { voteColorScaleCss, voteCountToColor } from "@/lib/vote-color-scale";
 import type { ThroneClaimHistoryEntry, ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import ThroneClaimModal from "./ThroneClaimModal";
@@ -668,6 +668,16 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
             <button type="button" aria-label="Reset view" onClick={resetView} className={buttonClass}>
               ⟲
             </button>
+          </div>
+          {/* Minimal color key — the fill scale (see vote-color-scale.ts) is
+              otherwise unexplained on the map itself. Just the two
+              endpoints; the map's own sqrt curve between them isn't
+              something a legend needs to reproduce, only which direction
+              is "more votes." */}
+          <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md border border-border/60 bg-surface/90 px-2 py-1 text-[10px] text-muted-2 backdrop-blur-sm">
+            <span>Fewer votes</span>
+            <span className="h-1.5 w-12 rounded-full" style={{ background: voteColorScaleCss() }} />
+            <span>Leader</span>
           </div>
           {hoveredCountry &&
             (() => {
