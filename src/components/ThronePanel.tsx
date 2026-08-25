@@ -74,7 +74,7 @@ export default function ThronePanel({ isoCode, countryName, throne, claimHistory
               scale={throne.postImageScale}
               offsetX={throne.postImageOffsetX}
               offsetY={throne.postImageOffsetY}
-              className="h-56 w-full rounded-sm"
+              className="h-80 w-full rounded-sm"
             />
           )}
 
