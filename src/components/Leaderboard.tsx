@@ -17,6 +17,7 @@ import {
   xIntentUrl,
 } from "@/lib/share";
 import { isVacant, type ThroneEntry } from "@/lib/throne";
+import { twitterImageVariant } from "@/lib/twitter-image";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import Flag from "./Flag";
 
@@ -368,13 +369,21 @@ export default function Leaderboard({
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map(({ entry, throne }, index) => {
           const votedHere = voteStatus?.votedCountryIsoCode === entry.isoCode;
           const submitting = submittingIso === entry.isoCode;
           const voteLabel = submitting ? "…" : votedHere ? "Voted" : "Vote";
           const change = rankChange24h(entry.isoCode);
+          const hasLeader = !isVacant(throne);
           const leaderAvatar = throne?.postAuthorAvatarUrl || throne?.logoUrl || null;
+          const leaderName = throne?.brandTitle ?? (throne?.handle ? `@${throne.handle}` : "Has a leader");
+          // What shows in the hover preview when this country has a leader
+          // — their pinned/linked post first, falling back to their own
+          // description if the post has no text. Same pattern as
+          // ClosestBattles' hover preview.
+          const previewText = throne?.postText || throne?.description || null;
+          const previewImage = throne?.postImageUrl ? twitterImageVariant(throne.postImageUrl, "small") : null;
           const href = `/${getSlugForCountry(entry.isoCode) ?? entry.isoCode.toLowerCase()}`;
 
           const openCountry = () => {
@@ -399,38 +408,66 @@ export default function Leaderboard({
                   openCountry();
                 }
               }}
-              className={`relative flex aspect-square cursor-pointer flex-col items-center justify-between rounded-2xl border bg-surface p-2.5 text-center transition-colors hover:bg-surface-hover ${
+              className={`relative flex aspect-square cursor-pointer flex-col items-center justify-between rounded-2xl border bg-surface p-5 text-center transition-colors hover:bg-surface-hover ${
                 highlightedIso === entry.isoCode ? "border-accent ring-2 ring-accent" : "border-border"
               }`}
             >
               <div className="flex w-full items-start justify-between">
-                <span className="font-mono text-[11px] text-muted">#{index + 1}</span>
+                <span className="font-mono text-sm text-muted">#{index + 1}</span>
                 {change !== null && change !== 0 && (
-                  <span className={`font-mono text-[10px] ${change > 0 ? "text-success" : "text-danger"}`}>
+                  <span className={`font-mono text-xs ${change > 0 ? "text-success" : "text-danger"}`}>
                     {change > 0 ? "↑" : "↓"}
                     {Math.abs(change)}
                   </span>
                 )}
               </div>
 
-              {/* Leader thumbnail — small badge in the corner, only when the
-                  country actually has one. */}
-              {leaderAvatar && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={leaderAvatar}
-                  alt=""
-                  className="absolute right-2 top-6 h-6 w-6 rounded-full border-2 border-accent object-cover shadow"
-                />
-              )}
+              <Flag alpha2={entry.isoCode} width={56} />
+              <p className="w-full truncate text-base font-semibold text-foreground">{entry.name}</p>
 
-              <Flag alpha2={entry.isoCode} width={36} />
-              <p className="w-full truncate text-xs font-medium text-foreground">{entry.name}</p>
-              <p className="font-mono text-sm font-semibold text-foreground">
+              {/* Leadership — a crown (solid when held, faded/desaturated
+                  when vacant, so it reads at a glance), the leader's avatar
+                  and name when there is one, and — on hover — a preview of
+                  what they've shared, same as Closest Battles' cards. */}
+              <div
+                className="group/leader relative flex items-center gap-1.5 text-xs"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <span aria-hidden="true" className={hasLeader ? "text-sm" : "text-sm opacity-30 grayscale"}>
+                  👑
+                </span>
+                {leaderAvatar && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={leaderAvatar}
+                    alt=""
+                    className="h-4 w-4 rounded-full border border-accent object-cover"
+                  />
+                )}
+                {hasLeader ? (
+                  <span className="max-w-[120px] truncate text-accent">{leaderName}</span>
+                ) : (
+                  <span className="text-muted-2">No leader</span>
+                )}
+
+                {hasLeader && (previewText || previewImage) && (
+                  <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 max-w-[80vw] -translate-x-1/2 rounded-xl border border-border bg-surface p-3 opacity-0 shadow-xl transition-opacity duration-150 group-hover/leader:opacity-100">
+                    {previewImage && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={previewImage} alt="" className="mb-2 h-24 w-full rounded-lg object-cover" />
+                    )}
+                    {previewText && (
+                      <p className="line-clamp-4 text-left text-xs italic text-muted">&ldquo;{previewText}&rdquo;</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <p className="font-mono text-lg font-bold text-foreground">
                 {entry.voteCount.toLocaleString("en-US")}
               </p>
 
-              <div className="flex w-full items-center gap-1">
+              <div className="flex w-full items-center gap-2">
                 <button
                   type="button"
                   onClick={(event) => {
@@ -438,7 +475,7 @@ export default function Leaderboard({
                     onVote(entry.isoCode);
                   }}
                   disabled={submitting || votedHere}
-                  className="flex-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+                  className="flex-1 rounded-full bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
                 >
                   {voteLabel}
                 </button>
@@ -450,12 +487,12 @@ export default function Leaderboard({
                   }}
                   aria-label={`Share ${entry.name} on X`}
                   title="Share on X"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
                 >
                   <svg
                     viewBox="0 0 24 24"
-                    width={11}
-                    height={11}
+                    width={13}
+                    height={13}
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={2}
