@@ -1,17 +1,17 @@
-// Sequential fill color for the map's vote choropleth: a muted steel-blue
-// at zero votes (still clearly a *color*, not just dark gray blending into
-// the background) up to the dulled bronze accent for the current leader.
-// Plain RGB lerp rather than a d3-scale dependency — it's one straight line
-// between two colors.
+// Sequential fill color for the map's vote choropleth: vivid blue at zero
+// votes up to a hot vivid red for the current leader — a "cold to hot"
+// heat-map read, deliberately vivid (direct request, reversing an earlier
+// pass that muted this along with the rest of the theme: the map's colors
+// are functional/legibility-driven, not decorative, so they stay vivid
+// even though buttons/chrome moved to the flatter black/yellow/red CTA
+// look — see cta-style.ts). Plain RGB lerp rather than a d3-scale
+// dependency — it's one straight line between two colors.
 //
-// Deliberately desaturated/darkened from the original's bright vivid blue
-// and canary gold — direct request: less eye-catching, more of a war-map
-// ink tone — while still reading clearly against the near-black map
-// background (see WorldMapInteractive's map container) so land stays
-// obviously land, not a shade away from the sea. See gelistirme-plani-v2.md
-// AŞAMA 1.5.
-const LIGHT: [number, number, number] = [62, 78, 102]; // muted steel-blue
-const DARK: [number, number, number] = [179, 137, 44]; // matches --accent
+// Bright enough to read clearly against the near-black map background
+// (see WorldMapInteractive's map container) so land stays obviously land,
+// not a shade away from the sea. See gelistirme-plani-v2.md AŞAMA 1.5.
+const LIGHT: [number, number, number] = [59, 130, 246]; // vivid blue
+const DARK: [number, number, number] = [225, 29, 45]; // vivid red — "hot," matches the war theme
 
 // A flat linear gradient between the same two endpoints voteCountToColor
 // interpolates between — for the map's color-key legend, not the map
