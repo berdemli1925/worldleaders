@@ -402,6 +402,19 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     mapRef.current?.focusCountry(isoCode);
   }, []);
 
+  // Auto-zoom to the visitor's own (detected or picked) country — direct
+  // request, fired from Hero once it knows guessIso (see Hero.tsx). Skipped
+  // when a shared link (?country=XX) is already driving the initial view
+  // below: that's an explicit destination someone sent them to and should
+  // win over a passive IP/browser guess, not get overridden by it.
+  const handleGuessedCountry = useCallback(
+    (isoCode: string) => {
+      if (initialHighlightIso) return;
+      mapRef.current?.focusCountry(isoCode);
+    },
+    [initialHighlightIso],
+  );
+
   // A shared-link visit (?country=XX, from the leaderboard row share
   // button) should land on and expand that country the same way clicking
   // its ticker entry does — reuses the same highlight/scroll logic, just
@@ -438,6 +451,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         claimHistory={claimHistory}
         now={now}
         onThroneClaimed={handleThroneClaimed}
+        onGuessedCountry={handleGuessedCountry}
       />
       <TopBar totalVotes={totalVotes} resetTarget={resetTarget} now={now} />
       <div className="w-full rounded-2xl border border-border bg-surface p-4">
@@ -485,6 +499,8 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         onSelectCountry={handleSelectCountry}
         momentum={momentum}
         onShareBonusGranted={handleShareBonusGranted}
+        countries={countries}
+        onThroneClaimed={handleThroneClaimed}
       />
       <LeaderTicker items={tickerItems} onSelect={handleTickerSelect} />
       {voteResult && (

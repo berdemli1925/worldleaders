@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
+import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
 import { getSlugForCountry } from "@/lib/country-slug";
 import { getFingerprint } from "@/lib/fingerprint";
@@ -20,7 +21,10 @@ import {
 import { isVacant, requiredMinimum, type ThroneEntry } from "@/lib/throne";
 import { twitterImageVariant } from "@/lib/twitter-image";
 import type { MyVoteStatus } from "@/lib/use-vote";
+import ClaimThroneButton from "./ClaimThroneButton";
 import Flag from "./Flag";
+import ThroneClaimModal from "./ThroneClaimModal";
+import type { CountryPath } from "./WorldMapInteractive";
 
 // Re-exported under this name since every existing caller (Dashboard,
 // ClosestBattles, VoteResultModal, ...) already imports LeaderboardEntry
@@ -42,6 +46,10 @@ interface LeaderboardProps {
   momentum: SerializedMomentum | null;
   /** Called after a share-on-X bonus is newly granted, so the parent can refetch and reflect it — see src/lib/share-bonus.ts. */
   onShareBonusGranted?: () => void;
+  /** Country outline/bounds data — same as WorldMapInteractive/Hero — needed here now that cards open ThroneClaimModal directly (its image positioner clips to the country's own shape). */
+  countries: CountryPath[];
+  /** Refetches throne state after a claim completes — same callback Hero/WorldMapInteractive already use. */
+  onThroneClaimed: () => void;
 }
 
 const CONTINENTS = ["All", "Europe", "Asia", "Africa", "Americas", "Oceania"] as const;
@@ -94,8 +102,15 @@ export default function Leaderboard({
   onSelectCountry,
   momentum,
   onShareBonusGranted,
+  countries,
+  onThroneClaimed,
 }: LeaderboardProps) {
   const router = useRouter();
+  const countryByAlpha2 = useMemo(() => buildCountryByAlpha2(countries), [countries]);
+  // Which country's claim modal is open, if any — a card's own crown/claim
+  // button opens this directly rather than routing through the map, so a
+  // claim can happen without ever leaving the leaderboard grid.
+  const [claimIso, setClaimIso] = useState<string | null>(null);
 
   // Opens an X share-intent window pre-filled with a link back to this
   // country (?country=XX, read by page.tsx's generateMetadata for the
@@ -423,7 +438,7 @@ export default function Leaderboard({
                   openCountry();
                 }
               }}
-              className={`relative flex aspect-square cursor-pointer flex-col items-center justify-between rounded-2xl border bg-surface p-5 text-center transition-colors hover:bg-surface-hover ${
+              className={`relative flex cursor-pointer flex-col items-center gap-3 rounded-2xl border bg-surface p-5 text-center transition-colors hover:bg-surface-hover ${
                 highlightedIso === entry.isoCode ? "border-accent ring-2 ring-accent" : "border-border"
               }`}
             >
@@ -441,22 +456,26 @@ export default function Leaderboard({
               <p className="w-full truncate text-base font-semibold text-foreground">{entry.name}</p>
 
               {/* Leadership — a crown (solid when held, faded/desaturated
-                  when vacant, so it reads at a glance), the leader's avatar
-                  and name when there is one, and — on hover — a preview of
-                  what they've shared, same as Closest Battles' cards. */}
+                  when vacant, so it reads at a glance) plus a small,
+                  always-visible thumbnail of what the leader posted (their
+                  own post image, falling back to their avatar/logo) — not
+                  just their name — so there's actually something to look at
+                  before hovering. Hovering enlarges it into a readable
+                  preview (image + full quoted text), same interaction
+                  Closest Battles' cards use. */}
               <div
-                className="group/leader relative flex items-center gap-1.5 text-xs"
+                className="group/leader relative flex items-center gap-2 text-xs"
                 onClick={(event) => event.stopPropagation()}
               >
                 <span aria-hidden="true" className={hasLeader ? "text-sm" : "text-sm opacity-30 grayscale"}>
                   👑
                 </span>
-                {leaderAvatar && (
+                {(previewImage || leaderAvatar) && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={leaderAvatar}
+                    src={previewImage || (leaderAvatar as string)}
                     alt=""
-                    className="h-4 w-4 rounded-full border border-accent object-cover"
+                    className="h-7 w-7 rounded-md border border-accent object-cover"
                   />
                 )}
                 {hasLeader ? (
@@ -522,6 +541,10 @@ export default function Leaderboard({
                   </svg>
                 </button>
               </div>
+
+              <div className="w-full" onClick={(event) => event.stopPropagation()}>
+                <ClaimThroneButton throne={throne} onOpenClaim={() => setClaimIso(entry.isoCode)} className="w-full" />
+              </div>
             </div>
           );
         })}
@@ -544,6 +567,23 @@ export default function Leaderboard({
       )}
 
       {voteError && <p className="text-sm text-danger">{voteError}</p>}
+
+      {claimIso &&
+        (() => {
+          const country = countryByAlpha2.get(claimIso);
+          const meta = getCountryMeta(claimIso);
+          return (
+            <ThroneClaimModal
+              isoCode={claimIso}
+              countryName={meta?.name ?? claimIso}
+              throne={throneByIso.get(claimIso)}
+              countryPathD={country?.d}
+              countryBounds={country?.bounds}
+              onClose={() => setClaimIso(null)}
+              onClaimed={onThroneClaimed}
+            />
+          );
+        })()}
     </section>
   );
 }

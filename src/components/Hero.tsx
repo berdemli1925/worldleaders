@@ -31,6 +31,8 @@ interface HeroProps {
   claimHistory: ThroneClaimHistoryEntry[];
   now: number | null;
   onThroneClaimed: () => void;
+  /** Fires once the visitor's own country is known (IP guess, browser-language fallback, or a manual "Not you?" pick) — Dashboard uses this to auto-zoom the map there, direct request: land straight on "here's where you are" instead of the whole-world default view. */
+  onGuessedCountry?: (isoCode: string) => void;
 }
 
 const OVERRIDE_KEY = "wl-country-override";
@@ -73,6 +75,7 @@ export default function Hero({
   claimHistory,
   now,
   onThroneClaimed,
+  onGuessedCountry,
 }: HeroProps) {
   const [override, setOverride] = useState<string | null>(null);
   const [clientGuess, setClientGuess] = useState<string | undefined>(undefined);
@@ -94,6 +97,19 @@ export default function Hero({
   }, []);
 
   const guessIso = override ?? serverGuessIso ?? clientGuess;
+
+  // Auto-zoom the map to the visitor's own country — direct request. Fires
+  // once guessIso first resolves (override/clientGuess only settle after
+  // mount, see the effect above — serverGuessIso is available immediately
+  // but still waits for that same render) and again on an explicit "Not
+  // you?" pick, since re-zooming there is exactly the confirmation a
+  // manual correction should give. Doesn't need debouncing beyond the
+  // dependency array itself: guessIso only ever changes to a genuinely new
+  // value, never re-fires for the same country.
+  useEffect(() => {
+    if (guessIso) onGuessedCountry?.(guessIso);
+  }, [guessIso, onGuessedCountry]);
+
   const guessMeta = guessIso ? getCountryMeta(guessIso) : undefined;
   const guessRank = guessIso ? rankByIso.get(guessIso) : undefined;
 
