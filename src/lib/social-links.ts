@@ -146,3 +146,58 @@ export function computeLeaderIdentityKey(urls: {
   }
   return null;
 }
+
+/**
+ * A URL for the leader's own profile photo, sourced from whichever
+ * platform they actually declared as their identity (same priority as
+ * computeLeaderIdentityKey above) — direct request: "sosyal medya hesabı
+ * girdiyse o hesabın profil fotoğrafı." Used by the map's leader markers
+ * (WorldMapInteractive.tsx), which fall back further to the leader's
+ * website logo, then a plain flag+crown, if this returns null.
+ *
+ * Real capability varies a lot by platform:
+ * - X: no direct profile-photo API, but every claim requires a linked
+ *   post (see the module header comment above), which we already fetch
+ *   server-side and get the author's avatar from for free. Best-effort,
+ *   not verified: that post can technically be *any* public post, not
+ *   necessarily one by this exact account — but it's the closest real
+ *   photo available, and correct in the overwhelmingly common case of a
+ *   leader linking their own post.
+ * - Facebook: `graph.facebook.com/{id}/picture` serves a Page/profile's
+ *   picture with no access token required — one of the only Graph API
+ *   fields Meta still exposes unauthenticated. Doesn't resolve for every
+ *   account (older personal profiles especially) — the caller's onError
+ *   handling is expected to fall back gracefully, same as any other
+ *   marker image.
+ * - Instagram/TikTok: no free, stable, unauthenticated way to fetch a
+ *   profile photo from either today (Instagram's Graph API requires an
+ *   access token even for public profiles; TikTok's oEmbed only covers
+ *   individual videos/photos, not bare profile URLs) — scraping either
+ *   would be unreliable and against their terms, so this deliberately
+ *   returns null for both rather than attempting it.
+ */
+export function leaderAvatarSourceUrl(fields: {
+  x: string | null;
+  instagram: string | null;
+  tiktok: string | null;
+  facebook: string | null;
+  /** The linked post's author avatar (see throne.ts) — used for the "x" case, and as a last-resort fallback when no identity field parses at all. */
+  postAuthorAvatarUrl: string | null;
+}): string | null {
+  const key = computeLeaderIdentityKey(fields);
+  if (!key) return fields.postAuthorAvatarUrl;
+
+  const separator = key.indexOf(":");
+  const platform = key.slice(0, separator) as SocialPlatform;
+  const handle = key.slice(separator + 1);
+
+  switch (platform) {
+    case "x":
+      return fields.postAuthorAvatarUrl;
+    case "facebook":
+      return `https://graph.facebook.com/${encodeURIComponent(handle)}/picture?type=large`;
+    case "instagram":
+    case "tiktok":
+      return null;
+  }
+}
