@@ -1,15 +1,17 @@
-// Sequential fill color for the map's vote choropleth: a vivid blue at zero
-// votes (still clearly a *color*, not just dark gray blending into the
-// background) up to full accent gold for the current leader. Plain RGB lerp
-// rather than a d3-scale dependency — it's one straight line between two
-// colors.
+// Sequential fill color for the map's vote choropleth: a muted steel-blue
+// at zero votes (still clearly a *color*, not just dark gray blending into
+// the background) up to the dulled bronze accent for the current leader.
+// Plain RGB lerp rather than a d3-scale dependency — it's one straight line
+// between two colors.
 //
-// Brighter than the original LIGHT — needs to read clearly against the
-// much darker map background introduced alongside this (see
-// WorldMapInteractive's map container) so land stays obviously land, not a
-// shade away from the sea. See gelistirme-plani-v2.md AŞAMA 1.5.
-const LIGHT: [number, number, number] = [88, 133, 214]; // bright vivid blue
-const DARK: [number, number, number] = [245, 179, 1]; // matches --accent
+// Deliberately desaturated/darkened from the original's bright vivid blue
+// and canary gold — direct request: less eye-catching, more of a war-map
+// ink tone — while still reading clearly against the near-black map
+// background (see WorldMapInteractive's map container) so land stays
+// obviously land, not a shade away from the sea. See gelistirme-plani-v2.md
+// AŞAMA 1.5.
+const LIGHT: [number, number, number] = [62, 78, 102]; // muted steel-blue
+const DARK: [number, number, number] = [156, 90, 31]; // matches --accent
 
 // A flat linear gradient between the same two endpoints voteCountToColor
 // interpolates between — for the map's color-key legend, not the map

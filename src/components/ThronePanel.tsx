@@ -51,7 +51,7 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
               scale={throne.postImageScale}
               offsetX={throne.postImageOffsetX}
               offsetY={throne.postImageOffsetY}
-              className="h-56 w-full rounded-xl"
+              className="h-56 w-full rounded-md"
             />
           )}
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -77,7 +77,7 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
                     <span className="font-mono font-medium text-accent">{formatMoney(throne.currentValue ?? 0)}</span>
                   </>
                 ) : (
-                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
+                  <span className="rounded-sm bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
                     Free (beta)
                   </span>
                 )}
@@ -136,7 +136,7 @@ export default function ThronePanel({ isoCode, throne, claimHistory, now, onOpen
       {visibleHistory.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           {visibleHistory.map((past) => (
-            <span key={past.id} className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-muted">
+            <span key={past.id} className="rounded-sm bg-white/5 px-2 py-1 text-[11px] text-muted">
               @{past.handle} · {formatPastAmount(past.amountPaid)}
             </span>
           ))}

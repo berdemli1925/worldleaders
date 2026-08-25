@@ -28,7 +28,7 @@ export default function SiteNav() {
             <Link
               href="/rules"
               title="Leadership is free during the beta — see Rules for details"
-              className="rounded-full border border-accent/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/10"
+              className="rounded-sm border border-accent/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/10"
             >
               Beta
             </Link>
@@ -45,8 +45,8 @@ export default function SiteNav() {
                 aria-current={isActive ? "page" : undefined}
                 className={
                   isActive
-                    ? "rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground"
-                    : "rounded-full px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                    ? "rounded-sm bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground"
+                    : "rounded-sm px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
                 }
               >
                 {link.label}
@@ -82,8 +82,8 @@ export default function SiteNav() {
                 onClick={() => setMobileOpen(false)}
                 className={
                   isActive
-                    ? "rounded-full bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
-                    : "rounded-full px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
+                    ? "rounded-sm bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
+                    : "rounded-sm px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
                 }
               >
                 {link.label}

@@ -81,7 +81,7 @@ export default async function ChampionsPage() {
         </div>
 
         {months.size === 0 ? (
-          <div className="rounded-2xl border border-border bg-surface px-4 py-12 text-center">
+          <div className="rounded-md border border-border bg-surface px-4 py-12 text-center">
             <p className="text-sm text-muted">
               No champions yet. The first monthly winners are archived when {nextMonthLabel()} begins.
             </p>
@@ -89,13 +89,13 @@ export default async function ChampionsPage() {
         ) : (
           <div className="flex flex-col gap-4">
             {[...months.entries()].map(([month, monthRows]) => (
-              <section key={month} className="rounded-2xl border border-border bg-surface p-4">
+              <section key={month} className="rounded-md border border-border bg-surface p-4">
                 <h2 className="mb-3 text-sm font-medium text-muted">{monthLabel(month)}</h2>
                 <div className="flex flex-col gap-2">
                   {monthRows.map((row) => (
                     <div key={`${month}-${row.rank}`} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border font-mono text-xs font-semibold ${
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border font-mono text-xs font-semibold ${
                           RANK_BADGE_STYLE[row.rank] ?? RANK_BADGE_STYLE[3]
                         }`}
                       >

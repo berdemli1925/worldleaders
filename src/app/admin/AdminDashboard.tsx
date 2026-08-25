@@ -98,7 +98,7 @@ export default function AdminDashboard({
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between rounded-2xl border border-danger/40 bg-danger/10 p-4">
+      <div className="flex items-center justify-between rounded-md border border-danger/40 bg-danger/10 p-4">
         <div>
           <p className="text-sm font-medium text-foreground">Emergency kill switch</p>
           <p className="text-xs text-muted">
@@ -113,8 +113,8 @@ export default function AdminDashboard({
           onClick={() => run("kill-switch", "/api/admin/kill-switch", { hidden: !leadershipHidden })}
           className={
             leadershipHidden
-              ? "rounded-full bg-surface-hover px-4 py-2 text-sm font-medium text-foreground hover:bg-surface"
-              : "rounded-full bg-danger px-4 py-2 text-sm font-medium text-white hover:brightness-110"
+              ? "rounded-sm bg-surface-hover px-4 py-2 text-sm font-medium text-foreground hover:bg-surface"
+              : "rounded-sm bg-danger px-4 py-2 text-sm font-medium text-white hover:brightness-110"
           }
         >
           {leadershipHidden ? "Restore leadership content" : "Hide all leadership content"}
@@ -128,7 +128,7 @@ export default function AdminDashboard({
         {activeLeaders.length === 0 && <p className="text-sm text-muted">No active leaders.</p>}
         <div className="flex flex-col gap-3">
           {activeLeaders.map((leader) => (
-            <div key={leader.claimId} className="rounded-2xl border border-border bg-surface p-4">
+            <div key={leader.claimId} className="rounded-md border border-border bg-surface p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-foreground">
@@ -150,7 +150,7 @@ export default function AdminDashboard({
                         reason: "Removed by admin.",
                       })
                     }
-                    className="rounded-full bg-danger/15 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/25"
+                    className="rounded-sm bg-danger/15 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/25"
                   >
                     Remove content
                   </button>
@@ -158,7 +158,7 @@ export default function AdminDashboard({
                     type="button"
                     disabled={busy === `reset-${leader.country}`}
                     onClick={() => run(`reset-${leader.country}`, `/api/admin/thrones/${leader.country}/reset`)}
-                    className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-hover"
+                    className="rounded-sm border border-border px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-hover"
                   >
                     Reset throne
                   </button>
@@ -174,7 +174,7 @@ export default function AdminDashboard({
         {moderationReports.length === 0 && <p className="text-sm text-muted">No open reports.</p>}
         <div className="flex flex-col gap-3">
           {moderationReports.map((report) => (
-            <div key={report.id} className="rounded-2xl border border-border bg-surface p-4">
+            <div key={report.id} className="rounded-md border border-border bg-surface p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-foreground">
@@ -192,7 +192,7 @@ export default function AdminDashboard({
                         reason: `Removed following report: ${report.reason}`,
                       })
                     }
-                    className="rounded-full bg-danger/15 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/25"
+                    className="rounded-sm bg-danger/15 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/25"
                   >
                     Remove content
                   </button>
@@ -200,7 +200,7 @@ export default function AdminDashboard({
                     type="button"
                     disabled={busy === `resolve-${report.id}`}
                     onClick={() => run(`resolve-${report.id}`, `/api/admin/reports/${report.id}/resolve`, {})}
-                    className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-hover"
+                    className="rounded-sm border border-border px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-hover"
                   >
                     Mark resolved
                   </button>
@@ -213,20 +213,20 @@ export default function AdminDashboard({
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold text-foreground">Blocked handles ({blockedHandles.length})</h2>
-        <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-surface p-4">
+        <div className="flex flex-wrap gap-2 rounded-md border border-border bg-surface p-4">
           <input
             type="text"
             value={blockHandleInput}
             onChange={(event) => setBlockHandleInput(event.target.value)}
             placeholder="@handle"
-            className="flex-1 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-accent"
+            className="flex-1 rounded-sm border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-accent"
           />
           <input
             type="text"
             value={blockReasonInput}
             onChange={(event) => setBlockReasonInput(event.target.value)}
             placeholder="Reason (optional)"
-            className="flex-1 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-accent"
+            className="flex-1 rounded-sm border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-accent"
           />
           <button
             type="button"
@@ -239,7 +239,7 @@ export default function AdminDashboard({
               setBlockHandleInput("");
               setBlockReasonInput("");
             }}
-            className="rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-sm bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Block
           </button>
@@ -249,7 +249,7 @@ export default function AdminDashboard({
           {blockedHandles.map((blocked) => (
             <div
               key={blocked.xHandle}
-              className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-2"
+              className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-2"
             >
               <p className="text-sm text-foreground">
                 @{blocked.xHandle}
@@ -261,7 +261,7 @@ export default function AdminDashboard({
                 onClick={() =>
                   run(`unblock-${blocked.xHandle}`, "/api/admin/handles/unblock", { xHandle: blocked.xHandle })
                 }
-                className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:bg-surface-hover"
+                className="rounded-sm border border-border px-3 py-1 text-xs text-muted hover:bg-surface-hover"
               >
                 Unblock
               </button>
@@ -275,12 +275,12 @@ export default function AdminDashboard({
         {paymentRows.length === 0 && <p className="text-sm text-muted">No payments yet.</p>}
         <div className="flex flex-col gap-2">
           {paymentRows.map((payment) => (
-            <div key={payment.id} className="rounded-2xl border border-border bg-surface p-4">
+            <div key={payment.id} className="rounded-md border border-border bg-surface p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-foreground">
                     {payment.country} — @{payment.handle}
-                    <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${statusClasses(payment.status)}`}>
+                    <span className={`ml-2 rounded-sm px-2 py-0.5 text-xs font-medium ${statusClasses(payment.status)}`}>
                       {payment.status}
                     </span>
                   </p>

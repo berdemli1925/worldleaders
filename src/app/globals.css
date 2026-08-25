@@ -8,8 +8,13 @@
   --foreground: #f4f4f5;
   --muted: #9c9ca4;
   --muted-2: #6c6c74;
-  --accent: #f5b301;
-  --accent-foreground: #1a1203;
+  /* Direct request: less vivid, more serious/sharp — a dulled bronze/rust
+     rather than the bright canary gold this used to be. Still reads as
+     "gold/power" for the crown-and-throne theme, just worn/battle-worn
+     instead of shiny-new. Keep --danger a true red so it stays visually
+     distinct from this — a war-red accent would collide with error state. */
+  --accent: #9c5a1f;
+  --accent-foreground: #f4ece0;
   --danger: #f2555a;
   --success: #34d399;
   --radius-card: 1rem;

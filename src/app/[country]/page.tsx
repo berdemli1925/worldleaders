@@ -111,15 +111,15 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-border bg-surface p-4">
+          <div className="rounded-md border border-border bg-surface p-4">
             <p className="text-xs text-muted-2">Rank this month</p>
             <p className="font-mono text-2xl font-bold text-foreground">#{rank}</p>
           </div>
-          <div className="rounded-2xl border border-accent/40 bg-accent/10 p-4">
+          <div className="rounded-md border border-accent/40 bg-accent/10 p-4">
             <p className="text-xs text-accent">Votes</p>
             <p className="font-mono text-2xl font-bold text-accent">{voteCount.toLocaleString("en-US")}</p>
           </div>
-          <div className="col-span-2 rounded-2xl border border-border bg-surface p-4 sm:col-span-1">
+          <div className="col-span-2 rounded-md border border-border bg-surface p-4 sm:col-span-1">
             <p className="text-xs text-muted-2">Last 7 days</p>
             <p
               className={`font-mono text-2xl font-bold ${
@@ -132,7 +132,7 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
         </div>
 
         {nextAboveName && votesToOvertake !== null && (
-          <p className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
+          <p className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-muted">
             <span className="font-semibold text-foreground">{votesToOvertake.toLocaleString("en-US")}</span> more
             vote{votesToOvertake === 1 ? "" : "s"} to pass{" "}
             <span className="font-medium text-foreground">{nextAboveName}</span> and take #{rank - 1}.
@@ -140,7 +140,7 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
         )}
 
         {mapPath && (
-          <div className="overflow-hidden rounded-2xl border border-border bg-[#040508]">
+          <div className="overflow-hidden rounded-md border border-border bg-[#040508]">
             <svg
               viewBox={(() => {
                 const [x0, y0, x1, y1] = mapPath.bounds;
@@ -162,7 +162,7 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
           </div>
         )}
 
-        <div className="rounded-2xl border border-border bg-surface p-5">
+        <div className="rounded-md border border-border bg-surface p-5">
           {throne?.current_value !== null && throne ? (
             <div className="flex flex-col gap-2">
               <p className="text-xs uppercase tracking-wide text-accent">Currently led by</p>
