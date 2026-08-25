@@ -546,6 +546,9 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         onShareBonusGranted={handleShareBonusGranted}
         countries={countries}
         onThroneClaimed={handleThroneClaimed}
+        hype={hype}
+        onHyped={handleHyped}
+        now={now}
       />
       <LeaderTicker items={tickerItems} onSelect={handleTickerSelect} />
       {voteResult && (
