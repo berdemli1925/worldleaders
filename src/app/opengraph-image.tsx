@@ -31,7 +31,7 @@ export default function Image() {
             <path d="M4 12c6-4 18-4 24 0" stroke="#f4f4f5" strokeWidth="1.7" strokeLinecap="round" />
             <path d="M4 21c6 3.6 18 3.6 24 0" stroke="#f4f4f5" strokeWidth="1.7" strokeLinecap="round" opacity={0.6} />
             <path d="M16 4c4.3 5.3 4.3 18.7 0 24" stroke="#f4f4f5" strokeWidth="1.7" strokeLinecap="round" opacity={0.55} />
-            <circle cx="22.5" cy="15.5" r="2.4" fill="#f5b301" />
+            <circle cx="22.5" cy="15.5" r="2.4" fill="#d8ab35" />
           </svg>
           <span style={{ display: "flex", fontSize: 20, textTransform: "uppercase" }}>
             <span style={{ color: "#9c9ca4", marginRight: 7 }}>World</span>

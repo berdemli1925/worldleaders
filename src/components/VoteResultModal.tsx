@@ -3,8 +3,9 @@
 import { useState } from "react";
 
 import { getFingerprint } from "@/lib/fingerprint";
+import type { RivalInfo } from "@/lib/rank";
 import {
-  buildShareText,
+  buildShareTextFor,
   claimShareBonus,
   countryShareUrl,
   detectShareLocale,
@@ -24,12 +25,7 @@ export interface VoteResult {
   prevRank?: number;
   /** How much this vote actually added — 0 for a same-country revote (already voted today), which the API no-ops. */
   voteDelta: number;
-  rival: {
-    isoCode: string;
-    name: string;
-    voteCount: number;
-    direction: "ahead" | "behind";
-  } | null;
+  rival: RivalInfo | null;
 }
 
 interface VoteResultModalProps {
@@ -50,8 +46,15 @@ export default function VoteResultModal({ result, onClose, onShareBonusGranted }
   const moved = prevRank !== undefined && prevRank !== newRank;
   const movedUp = moved && prevRank! > newRank;
 
-  // In the sharer's own language — see src/lib/share.ts.
-  const shareText = buildShareText(countryName, newRank, detectShareLocale());
+  // Matchup format against the closest rival when there is one, single-
+  // country format otherwise — in the sharer's own language. See
+  // src/lib/share.ts.
+  const shareText = buildShareTextFor(
+    { isoCode, name: countryName, voteCount: newVoteCount },
+    newRank,
+    rival,
+    detectShareLocale(),
+  );
   const shareUrl = countryShareUrl(isoCode);
   const shareImage = `/api/og/country/${isoCode}`;
 
