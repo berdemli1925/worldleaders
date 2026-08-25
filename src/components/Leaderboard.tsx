@@ -297,7 +297,15 @@ export default function Leaderboard({
     const nextPosByIso = new Map<string, { top: number; left: number }>();
     cardRefs.current.forEach((el, iso) => {
       const rect = el.getBoundingClientRect();
-      nextPosByIso.set(iso, { top: rect.top, left: rect.left });
+      // getBoundingClientRect() is viewport-relative — if the page scrolled
+      // between this run and the last one (easy to happen: this effect can
+      // fire on any re-render, e.g. the Hype countdown ticking once a
+      // second), every card's rect shifts by the scroll delta even though
+      // nothing actually reordered. Adding the scroll offset makes this a
+      // *document*-relative position instead, which only changes when a
+      // card genuinely moves in the layout — fixes all the cards visibly
+      // jumping while the page is mid-scroll.
+      nextPosByIso.set(iso, { top: rect.top + window.scrollY, left: rect.left + window.scrollX });
     });
 
     cardRefs.current.forEach((el, iso) => {

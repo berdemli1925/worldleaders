@@ -55,8 +55,17 @@ export interface RivalInfo {
 // basically a coin flip; the same 40-vote gap next to leaders with
 // thousands of votes is noise. The floor keeps small/new countries from
 // being excluded just for having small absolute numbers.
-const RIVAL_GAP_RATIO = 0.15;
-const RIVAL_GAP_FLOOR = 25;
+//
+// Loosened from an initial 0.15/25 (direct correction): the site's own
+// curated starting scores (seed-score.ts) deliberately put Turkey ~150
+// points ahead of Greece on day one ("Turkey first... with real gaps
+// between them"), which a strict ratio treated as "not a real rivalry" —
+// exactly backwards for the site's own flagship match-up. 0.5 keeps a
+// truly lopsided leader (10x the runner-up) falling back to the
+// single-country card, while letting intentional-but-sizeable gaps like
+// TR/GR still read as a contest.
+const RIVAL_GAP_RATIO = 0.5;
+const RIVAL_GAP_FLOOR = 30;
 
 /**
  * The country worth calling a "rival" for `isoCode` within `entries`
