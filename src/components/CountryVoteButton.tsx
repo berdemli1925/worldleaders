@@ -1,15 +1,22 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 
-import { buildShareText, countryShareUrl, openShareWindow, xIntentUrl } from "@/lib/share";
+import { getFingerprint } from "@/lib/fingerprint";
+import {
+  buildShareText,
+  claimShareBonus,
+  countryShareUrl,
+  detectShareLocale,
+  openShareWindow,
+  xIntentUrl,
+} from "@/lib/share";
 import { useVote } from "@/lib/use-vote";
 import TurnstileWidget, { type TurnstileWidgetHandle } from "./TurnstileWidget";
 
 interface CountryVoteButtonProps {
   isoCode: string;
   countryName: string;
-  /** For the "Voted! You're #N" line after a successful vote — this page's own rank isn't live, so it's the last-known rank plus what the vote API itself returns. */
   rank: number;
 }
 
@@ -22,6 +29,7 @@ interface CountryVoteButtonProps {
 export default function CountryVoteButton({ isoCode, countryName, rank }: CountryVoteButtonProps) {
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const [bonusGranted, setBonusGranted] = useState(false);
 
   const getTurnstileToken = useCallback(async () => {
     if (!turnstileSiteKey || !turnstileRef.current) return undefined;
@@ -32,6 +40,19 @@ export default function CountryVoteButton({ isoCode, countryName, rank }: Countr
 
   const voted = status?.votedCountryIsoCode === isoCode;
   const submitting = submittingIso === isoCode;
+
+  // Opens the share window in the visitor's own language (see
+  // src/lib/share.ts), then claims their one-time +5-vote share bonus in
+  // the background.
+  const handleShareOnX = () => {
+    const locale = detectShareLocale();
+    openShareWindow(xIntentUrl(buildShareText(countryName, rank, locale), countryShareUrl(isoCode)));
+    void (async () => {
+      const fingerprint = await getFingerprint();
+      const result = await claimShareBonus(isoCode, fingerprint);
+      if (result.granted) setBonusGranted(true);
+    })();
+  };
 
   return (
     <div className="flex flex-col gap-2">
@@ -52,12 +73,10 @@ export default function CountryVoteButton({ isoCode, countryName, rank }: Countr
       {error && <p className="text-center text-xs text-danger">{error}</p>}
       <button
         type="button"
-        onClick={() =>
-          openShareWindow(xIntentUrl(buildShareText(countryName, rank), countryShareUrl(isoCode)))
-        }
+        onClick={handleShareOnX}
         className="rounded-full border border-border px-5 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
       >
-        Share on X
+        {bonusGranted ? "Shared — +5 votes!" : "Share on X"}
       </button>
     </div>
   );

@@ -4,14 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import type { SerializedMomentum } from "@/lib/momentum";
-import { toRankedEntries } from "@/lib/rank";
+import { toRankedEntries, type CountryRow } from "@/lib/rank";
+import { SHARE_VOTE_BONUS } from "@/lib/share-bonus";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { mapThroneRow, type ThroneClaimHistoryEntry, type ThroneEntry, type ThroneRow } from "@/lib/throne";
+import { bonusByIso, mergeBonusMaps, THRONE_CLAIM_BONUS } from "@/lib/throne-bonus";
+import { currentMonthStartMs } from "@/lib/time";
 import { useVote } from "@/lib/use-vote";
 import ClosestBattles from "./ClosestBattles";
 import Hero from "./Hero";
 import LiveFeed from "./LiveFeed";
-import Leaderboard, { type LeaderboardEntry } from "./Leaderboard";
+import Leaderboard from "./Leaderboard";
 import LeaderTicker, { type TickerItem } from "./LeaderTicker";
 import TopBar from "./TopBar";
 import TurnstileWidget, { type TurnstileWidgetHandle } from "./TurnstileWidget";
@@ -46,10 +49,20 @@ function nextUtcMonthStart(from: number): number {
 }
 
 export default function Dashboard({ countries, width, height, initialHighlightIso, guessCountryIso }: DashboardProps) {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [allTimeEntries, setAllTimeEntries] = useState<LeaderboardEntry[]>([]);
+  // Raw DB rows — ranking (starting baseline + throne/share bonuses folded
+  // in, see src/lib/rank.ts) is derived from these below, not stored
+  // directly, so it always reflects the latest claimHistory/shareBonuses
+  // without needing a re-fetch of the vote counts themselves.
+  const [rawEntries, setRawEntries] = useState<CountryRow[]>([]);
+  const [rawAllTimeEntries, setRawAllTimeEntries] = useState<CountryRow[]>([]);
   const [thrones, setThrones] = useState<ThroneEntry[]>([]);
   const [claimHistory, setClaimHistory] = useState<ThroneClaimHistoryEntry[]>([]);
+  // Who has ever claimed their one-time X-share bonus, and for which
+  // country — see src/lib/share-bonus.ts. Country + timestamp only
+  // (share_bonuses_public hides voter identity, same pattern as
+  // throne_claims_public); may simply stay empty if the migration in
+  // scripts/setup-share-bonus.mjs hasn't been run yet.
+  const [shareBonuses, setShareBonuses] = useState<{ isoCode: string; createdAt: number }[]>([]);
   const [highlightedIso, setHighlightedIso] = useState<string | null>(null);
   const votesChannelRef = useRef<RealtimeChannel | null>(null);
   const thronesChannelRef = useRef<RealtimeChannel | null>(null);
@@ -74,20 +87,18 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
   // ranking) and "leaderboard_all_time" (cumulative, backs the "All time"
   // tab) are two Supabase views with the identical column shape, differing
   // only in whether vote_count is date-scoped. See scripts/setup-monthly-archive.mjs.
-  // toRankedEntries (AŞAMA 5) adds each country's starting score and sorts
-  // by total power, not raw votes — see src/lib/rank.ts.
+  // Returns raw rows — ranking (starting baseline + bonuses) is applied
+  // downstream, see the entries/allTimeEntries useMemos below.
   const fetchRanking = useCallback(async (view: "leaderboard" | "leaderboard_all_time") => {
     const { data, error } = await supabaseBrowser.from(view).select("iso_code, name, continent, vote_count");
     if (error || !data) return null;
 
-    return toRankedEntries(
-      (data as { iso_code: string; name: string; continent: string; vote_count: number }[]).map((row) => ({
-        isoCode: row.iso_code,
-        name: row.name,
-        continent: row.continent,
-        voteCount: row.vote_count,
-      })),
-    );
+    return (data as { iso_code: string; name: string; continent: string; vote_count: number }[]).map((row) => ({
+      isoCode: row.iso_code,
+      name: row.name,
+      continent: row.continent,
+      voteCount: row.vote_count,
+    }));
   }, []);
 
   const fetchLeaderboard = useCallback(async () => {
@@ -95,11 +106,11 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
       fetchRanking("leaderboard"),
       fetchRanking("leaderboard_all_time"),
     ]);
-    if (month) setEntries(month);
-    if (allTime) setAllTimeEntries(allTime);
+    if (month) setRawEntries(month);
+    if (allTime) setRawAllTimeEntries(allTime);
     // Returned (not just set as state) so callers that need the *freshly
-    // fetched* ranking right away — see handleVoteCast below — don't have
-    // to wait an extra render for `entries` state to catch up.
+    // fetched* rows right away — see handleVoteCast below — don't have
+    // to wait an extra render for state to catch up.
     return month;
   }, [fetchRanking]);
 
@@ -181,6 +192,33 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     thronesChannelRef.current?.send({ type: "broadcast", event: "throne-claimed", payload: {} });
   }, [fetchThrones]);
 
+  // share_bonuses_public — see src/lib/share-bonus.ts. Fetched once on
+  // mount (bonuses only ever change one country/one person at a time, and
+  // whoever just claimed one gets an immediate local refetch — see
+  // handleShareBonusGranted below — so there's no need for a realtime
+  // channel like votes/thrones have). Silently stays empty if the table
+  // doesn't exist yet (migration not run) — same error-tolerant pattern as
+  // every other fetch here.
+  const fetchShareBonuses = useCallback(async () => {
+    const { data, error } = await supabaseBrowser.from("share_bonuses_public").select("country_iso_code, created_at");
+    if (error || !data) return;
+    setShareBonuses(
+      (data as { country_iso_code: string; created_at: string }[]).map((row) => ({
+        isoCode: row.country_iso_code,
+        createdAt: new Date(row.created_at).getTime(),
+      })),
+    );
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchShareBonuses();
+  }, [fetchShareBonuses]);
+
+  const handleShareBonusGranted = useCallback(() => {
+    fetchShareBonuses();
+  }, [fetchShareBonuses]);
+
   // AŞAMA 4 momentum data (24h/7d rank snapshots) — polled rather than
   // pushed over realtime like votes/thrones above: it's derived from a full
   // scan of this month's votes (see src/lib/momentum.ts), too heavy to
@@ -217,13 +255,47 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
   );
   const [voteResult, setVoteResult] = useState<VoteResult | null>(null);
 
+  // Throne-claim + share bonuses (src/lib/throne-bonus.ts, share-bonus.ts),
+  // merged into one map so src/lib/rank.ts's toRankedEntries has a single
+  // number to add per country. "This month" only counts events from the
+  // current UTC month (same reset as votes); "all time" counts every event
+  // ever.
+  const monthlyBonusByIso = useMemo(() => {
+    const monthStart = currentMonthStartMs();
+    return mergeBonusMaps(
+      bonusByIso(claimHistory, monthStart, THRONE_CLAIM_BONUS),
+      bonusByIso(shareBonuses, monthStart, SHARE_VOTE_BONUS),
+    );
+  }, [claimHistory, shareBonuses]);
+  const allTimeBonusByIso = useMemo(
+    () =>
+      mergeBonusMaps(
+        bonusByIso(claimHistory, 0, THRONE_CLAIM_BONUS),
+        bonusByIso(shareBonuses, 0, SHARE_VOTE_BONUS),
+      ),
+    [claimHistory, shareBonuses],
+  );
+
+  // The actual, ranked "votes" list every other part of the page reads —
+  // raw DB rows (rawEntries/rawAllTimeEntries) plus the bonus maps above,
+  // recombined whenever either changes. See src/lib/rank.ts.
+  const entries = useMemo(
+    () => toRankedEntries(rawEntries, monthlyBonusByIso),
+    [rawEntries, monthlyBonusByIso],
+  );
+  const allTimeEntries = useMemo(
+    () => toRankedEntries(rawAllTimeEntries, allTimeBonusByIso),
+    [rawAllTimeEntries, allTimeBonusByIso],
+  );
+
   const handleVoteCast = useCallback(async () => {
-    const fresh = await fetchLeaderboard();
+    const freshRaw = await fetchLeaderboard();
     votesChannelRef.current?.send({ type: "broadcast", event: "vote-cast", payload: {} });
 
     const pending = pendingVoteRef.current;
     pendingVoteRef.current = null;
-    if (!pending || !fresh) return;
+    if (!pending || !freshRaw) return;
+    const fresh = toRankedEntries(freshRaw, monthlyBonusByIso);
 
     const newIndex = fresh.findIndex((entry) => entry.isoCode === pending.isoCode);
     const newEntry = newIndex >= 0 ? fresh[newIndex] : undefined;
@@ -232,14 +304,13 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
 
     // Nearest rival: whoever's immediately above in rank (the one worth
     // catching), or — if this country is already #1 — whoever's immediately
-    // below (the one worth watching). Gap is in total power (AŞAMA 5),
-    // matching what actually separates their ranks — see VoteResultModal.
+    // below (the one worth watching).
     const rivalEntry = newIndex > 0 ? fresh[newIndex - 1] : fresh[newIndex + 1];
     const rival = rivalEntry
       ? {
           isoCode: rivalEntry.isoCode,
           name: rivalEntry.name,
-          totalPower: rivalEntry.totalPower,
+          voteCount: rivalEntry.voteCount,
           direction: (newIndex > 0 ? "ahead" : "behind") as "ahead" | "behind",
         }
       : null;
@@ -249,12 +320,11 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
       countryName: newEntry.name,
       newRank,
       newVoteCount: newEntry.voteCount,
-      newTotalPower: newEntry.totalPower,
       prevRank: pending.prevRank,
       voteDelta: newEntry.voteCount - pending.prevVoteCount,
       rival,
     });
-  }, [fetchLeaderboard]);
+  }, [fetchLeaderboard, monthlyBonusByIso]);
 
   const getTurnstileToken = useCallback(async () => {
     if (!turnstileSiteKey || !turnstileRef.current) return undefined;
@@ -284,18 +354,15 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     [castVote, entries],
   );
 
-  // Real votes only — the top stat bar and the map hover tooltip's "N
-  // votes" both need to stay honest about what's an actual vote (AŞAMA 5:
-  // starting scores are never presented as votes).
+  // One unified "votes" figure (starting baseline + real votes + bonuses,
+  // see src/lib/rank.ts) drives the top stat bar, the map's color scale,
+  // and its hover tooltip alike — there's no more separate "real votes
+  // only" number shown anywhere (direct request).
   const totalVotes = useMemo(() => entries.reduce((sum, entry) => sum + entry.voteCount, 0), [entries]);
   const voteCounts = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.voteCount])), [entries]);
-  // Total power (starting score + votes) drives the map's color scale
-  // instead — AŞAMA 5's whole point is that the map looks alive from day
-  // one, not flat until real votes accumulate.
-  const maxPower = useMemo(() => Math.max(1, ...entries.map((entry) => entry.totalPower)), [entries]);
-  const powerByIso = useMemo(() => new Map(entries.map((entry) => [entry.isoCode, entry.totalPower])), [entries]);
+  const maxVotes = useMemo(() => Math.max(1, ...entries.map((entry) => entry.voteCount)), [entries]);
   const resetTarget = useMemo(() => (now !== null ? nextUtcMonthStart(now) : null), [now]);
-  // `entries` is already sorted desc by total power (see toRankedEntries) —
+  // `entries` is already sorted desc by vote count (see toRankedEntries) —
   // rank is just its index. Shared by the hero ("Your country — ranked
   // #N") and the map's hover tooltip (see WorldMapInteractive).
   const rankByIso = useMemo(() => new Map(entries.map((entry, index) => [entry.isoCode, index + 1])), [entries]);
@@ -374,8 +441,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
               width={width}
               height={height}
               voteCounts={voteCounts}
-              powerByIso={powerByIso}
-              maxPower={maxPower}
+              maxVotes={maxVotes}
               rankByIso={rankByIso}
               leaderIso={entries[0]?.isoCode}
               voteStatus={voteStatus}
@@ -392,6 +458,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
       </div>
       <ClosestBattles
         entries={entries}
+        thrones={thrones}
         submittingIso={submittingIso}
         onVote={castVoteWithResult}
         onSelectCountry={handleTickerSelect}
@@ -413,9 +480,16 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         thrones={thrones}
         onSelectCountry={handleSelectCountry}
         momentum={momentum}
+        onShareBonusGranted={handleShareBonusGranted}
       />
       <LeaderTicker items={tickerItems} onSelect={handleTickerSelect} />
-      {voteResult && <VoteResultModal result={voteResult} onClose={() => setVoteResult(null)} />}
+      {voteResult && (
+        <VoteResultModal
+          result={voteResult}
+          onClose={() => setVoteResult(null)}
+          onShareBonusGranted={handleShareBonusGranted}
+        />
+      )}
     </div>
   );
 }

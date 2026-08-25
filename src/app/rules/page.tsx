@@ -32,22 +32,10 @@ export default function RulesPage() {
               <li>The monthly ranking resets on the 1st of every month, UTC. Older votes aren&apos;t deleted, just no
                 longer counted toward the current month — see the &quot;All time&quot; tab and the Champions page.</li>
               <li>Votes are checked by an invisible bot-protection challenge (Cloudflare Turnstile).</li>
-            </ul>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="text-base font-semibold text-foreground">Starting scores</h2>
-            <ul className="list-inside list-disc space-y-1">
-              <li>Every country begins the month with a <strong className="text-foreground">starting score</strong>,
-                so the map and leaderboard show real variation from the first vote rather than 250 identical,
-                empty-looking countries.</li>
-              <li>Starting scores are a fixed, curated list, not a formula and never random — the same country
-                always gets the same starting score. They&apos;re not based on population; most countries start at
-                a flat, minimal baseline, with a curated set of countries starting higher to reflect where this
-                site&apos;s activity realistically concentrates.</li>
-              <li>A country&apos;s rank is its <strong className="text-foreground">total power</strong>: starting
-                score plus real votes. The two are always shown separately — a starting score is never counted or
-                described as a vote.</li>
+              <li>Vote counts include a starting baseline for every country (a fixed, curated amount — never random,
+                never based on population), plus a bonus each time a country&apos;s throne is claimed, on top of
+                real votes cast here.</li>
+              <li>Sharing your vote on X adds 5 votes to that country&apos;s count, once ever per person.</li>
             </ul>
           </section>
 

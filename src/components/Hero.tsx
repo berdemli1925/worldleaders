@@ -99,9 +99,7 @@ export default function Hero({
     [entries],
   );
 
-  // Total power (AŞAMA 5), not raw votes — it's what actually separates
-  // #1 from #2.
-  const gap = leader && runnerUp ? leader.totalPower - runnerUp.totalPower : null;
+  const gap = leader && runnerUp ? leader.voteCount - runnerUp.voteCount : null;
 
   return (
     <section className="flex w-full flex-col gap-4 rounded-2xl border border-border bg-surface p-5 sm:p-6 lg:w-[380px] lg:shrink-0">
@@ -123,7 +121,7 @@ export default function Hero({
             <p className="truncate text-lg font-semibold text-foreground">{leader.name}</p>
           </div>
           <p className="shrink-0 font-mono text-lg font-bold text-accent">
-            {leader.totalPower.toLocaleString("en-US")}
+            {leader.voteCount.toLocaleString("en-US")}
           </p>
         </button>
       ) : (

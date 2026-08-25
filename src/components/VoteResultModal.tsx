@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 
+import { getFingerprint } from "@/lib/fingerprint";
 import {
   buildShareText,
+  claimShareBonus,
   countryShareUrl,
+  detectShareLocale,
   openShareWindow,
   telegramShareUrl,
   whatsappShareUrl,
@@ -17,8 +20,6 @@ export interface VoteResult {
   countryName: string;
   newRank: number;
   newVoteCount: number;
-  /** Starting score + votes (AŞAMA 5) — what the rival gap below is actually measured in. */
-  newTotalPower: number;
   /** Rank before this vote — undefined if unknown (first load) or unchanged from newRank means no movement to call out. */
   prevRank?: number;
   /** How much this vote actually added — 0 for a same-country revote (already voted today), which the API no-ops. */
@@ -26,7 +27,7 @@ export interface VoteResult {
   rival: {
     isoCode: string;
     name: string;
-    totalPower: number;
+    voteCount: number;
     direction: "ahead" | "behind";
   } | null;
 }
@@ -34,21 +35,37 @@ export interface VoteResult {
 interface VoteResultModalProps {
   result: VoteResult;
   onClose: () => void;
+  /** Called after a share-on-X bonus is newly granted, so the parent can refetch and reflect it — see src/lib/share-bonus.ts. */
+  onShareBonusGranted?: () => void;
 }
 
 // The result screen shown right after a vote — AŞAMA 2: "oy vermek şu an
 // sessiz bir işlem, olay olmalı" (voting is currently silent, it should feel
 // like an event). Dismissible, never blocks the rest of the page.
-export default function VoteResultModal({ result, onClose }: VoteResultModalProps) {
+export default function VoteResultModal({ result, onClose, onShareBonusGranted }: VoteResultModalProps) {
   const [copied, setCopied] = useState(false);
-  const { isoCode, countryName, newRank, newVoteCount, newTotalPower, prevRank, voteDelta, rival } = result;
+  const [bonusGranted, setBonusGranted] = useState(false);
+  const { isoCode, countryName, newRank, newVoteCount, prevRank, voteDelta, rival } = result;
 
   const moved = prevRank !== undefined && prevRank !== newRank;
   const movedUp = moved && prevRank! > newRank;
 
-  const shareText = buildShareText(countryName, newRank);
+  // In the sharer's own language — see src/lib/share.ts.
+  const shareText = buildShareText(countryName, newRank, detectShareLocale());
   const shareUrl = countryShareUrl(isoCode);
   const shareImage = `/api/og/country/${isoCode}`;
+
+  const handleShareOnX = () => {
+    openShareWindow(xIntentUrl(shareText, shareUrl));
+    void (async () => {
+      const fingerprint = await getFingerprint();
+      const result = await claimShareBonus(isoCode, fingerprint);
+      if (result.granted) {
+        setBonusGranted(true);
+        onShareBonusGranted?.();
+      }
+    })();
+  };
 
   const handleCopy = async () => {
     try {
@@ -122,9 +139,9 @@ export default function VoteResultModal({ result, onClose }: VoteResultModalProp
           <p className="mt-3 text-center text-sm text-muted">
             <span className="font-medium text-foreground">{rival.name}</span> is only{" "}
             <span className="font-mono font-semibold text-foreground">
-              {Math.abs(rival.totalPower - newTotalPower).toLocaleString("en-US")}
+              {Math.abs(rival.voteCount - newVoteCount).toLocaleString("en-US")}
             </span>{" "}
-            points {rival.direction}
+            votes {rival.direction}
           </p>
         )}
 
@@ -140,14 +157,14 @@ export default function VoteResultModal({ result, onClose }: VoteResultModalProp
         <div className="mt-4 grid grid-cols-4 gap-2">
           <button
             type="button"
-            onClick={() => openShareWindow(xIntentUrl(shareText, shareUrl))}
+            onClick={handleShareOnX}
             aria-label="Share on X"
             className="flex flex-col items-center gap-1 rounded-xl border border-border py-2.5 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             <svg viewBox="0 0 24 24" width={16} height={16} fill="currentColor">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
             </svg>
-            <span className="text-[10px]">X</span>
+            <span className="text-[10px]">{bonusGranted ? "+5!" : "X"}</span>
           </button>
           <button
             type="button"

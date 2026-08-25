@@ -5,9 +5,17 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { getCountryMeta } from "@/lib/country-meta";
 import { getSlugForCountry } from "@/lib/country-slug";
+import { getFingerprint } from "@/lib/fingerprint";
 import type { SerializedMomentum } from "@/lib/momentum";
 import type { RankedCountry } from "@/lib/rank";
-import { buildShareText, countryShareUrl, openShareWindow, xIntentUrl } from "@/lib/share";
+import {
+  buildShareText,
+  claimShareBonus,
+  countryShareUrl,
+  detectShareLocale,
+  openShareWindow,
+  xIntentUrl,
+} from "@/lib/share";
 import { isVacant, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import Flag from "./Flag";
@@ -30,6 +38,8 @@ interface LeaderboardProps {
   onSelectCountry: (isoCode: string) => void;
   /** AŞAMA 4 rank/vote snapshots — null until the first poll lands (see Dashboard.tsx). */
   momentum: SerializedMomentum | null;
+  /** Called after a share-on-X bonus is newly granted, so the parent can refetch and reflect it — see src/lib/share-bonus.ts. */
+  onShareBonusGranted?: () => void;
 }
 
 const CONTINENTS = ["All", "Europe", "Asia", "Africa", "Americas", "Oceania"] as const;
@@ -53,14 +63,6 @@ const SORT_MODES: [SortMode, string][] = [
   ["active", "Most active today"],
 ];
 
-// Opens an X share-intent window pre-filled with a link back to this
-// country (?country=XX, read by page.tsx's generateMetadata for the
-// per-country OG card — see /api/og/country). Same text/link builders as
-// the post-vote result screen — see src/lib/share.ts.
-function shareOnX(isoCode: string, countryName: string, rank: number): void {
-  openShareWindow(xIntentUrl(buildShareText(countryName, rank), countryShareUrl(isoCode)));
-}
-
 type Period = "month" | "allTime";
 const PERIODS: [Period, string][] = [
   ["month", "This month"],
@@ -83,8 +85,29 @@ export default function Leaderboard({
   thrones,
   onSelectCountry,
   momentum,
+  onShareBonusGranted,
 }: LeaderboardProps) {
   const router = useRouter();
+
+  // Opens an X share-intent window pre-filled with a link back to this
+  // country (?country=XX, read by page.tsx's generateMetadata for the
+  // per-country OG card — see /api/og/country), in the sharer's own
+  // language (see src/lib/share.ts), then claims their one-time +5-vote
+  // share bonus in the background — never blocks or delays the share
+  // window itself opening.
+  const handleShareOnX = useCallback(
+    (isoCode: string, countryName: string, rank: number) => {
+      const locale = detectShareLocale();
+      openShareWindow(xIntentUrl(buildShareText(countryName, rank, locale), countryShareUrl(isoCode)));
+      void (async () => {
+        const fingerprint = await getFingerprint();
+        const result = await claimShareBonus(isoCode, fingerprint);
+        if (result.granted) onShareBonusGranted?.();
+      })();
+    },
+    [onShareBonusGranted],
+  );
+
   const [search, setSearch] = useState("");
   const [continent, setContinent] = useState<ContinentFilter>("All");
   const [leaderFilter, setLeaderFilter] = useState<LeaderFilter>("all");
@@ -160,10 +183,8 @@ export default function Leaderboard({
       return true;
     });
     if (sortMode === "votes") {
-      // Total power (AŞAMA 5), not raw votes — this is the site's actual
-      // rank order, matching the hero/map/country pages.
       return [...list].sort(
-        (a, b) => b.entry.totalPower - a.entry.totalPower || a.entry.name.localeCompare(b.entry.name),
+        (a, b) => b.entry.voteCount - a.entry.voteCount || a.entry.name.localeCompare(b.entry.name),
       );
     }
     return [...list].sort(
@@ -406,7 +427,7 @@ export default function Leaderboard({
               <Flag alpha2={entry.isoCode} width={36} />
               <p className="w-full truncate text-xs font-medium text-foreground">{entry.name}</p>
               <p className="font-mono text-sm font-semibold text-foreground">
-                {entry.totalPower.toLocaleString("en-US")}
+                {entry.voteCount.toLocaleString("en-US")}
               </p>
 
               <div className="flex w-full items-center gap-1">
@@ -425,7 +446,7 @@ export default function Leaderboard({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    shareOnX(entry.isoCode, entry.name, index + 1);
+                    handleShareOnX(entry.isoCode, entry.name, index + 1);
                   }}
                   aria-label={`Share ${entry.name} on X`}
                   title="Share on X"

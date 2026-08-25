@@ -38,10 +38,8 @@ async function loadCountryPage(slug: string) {
   const rank = index >= 0 ? index + 1 : rows.length + 1;
   const row = index >= 0 ? rows[index] : null;
   const voteCount = row?.voteCount ?? 0;
-  const startingScore = row?.startingScore ?? 0;
-  const totalPower = row?.totalPower ?? 0;
   const nextAbove = index > 0 ? rows[index - 1] : null;
-  const votesToOvertake = nextAbove ? nextAbove.totalPower - totalPower + 1 : null;
+  const votesToOvertake = nextAbove ? nextAbove.voteCount - voteCount + 1 : null;
 
   const rankNow = momentum.rankNow.get(entry.alpha2) ?? rank;
   const rank7dAgo = momentum.rank7dAgo.get(entry.alpha2) ?? rankNow;
@@ -52,8 +50,6 @@ async function loadCountryPage(slug: string) {
     meta: getCountryMeta(entry.alpha2),
     rank,
     voteCount,
-    startingScore,
-    totalPower,
     nextAboveName: nextAbove?.name ?? null,
     votesToOvertake,
     weeklyChange,
@@ -99,19 +95,7 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
   const data = await loadCountryPage(country);
   if (!data) notFound();
 
-  const {
-    entry,
-    meta,
-    rank,
-    voteCount,
-    startingScore,
-    totalPower,
-    nextAboveName,
-    votesToOvertake,
-    weeklyChange,
-    throne,
-    mapPath,
-  } = data;
+  const { entry, meta, rank, voteCount, nextAboveName, votesToOvertake, weeklyChange, throne, mapPath } = data;
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-8 sm:py-12">
@@ -132,8 +116,8 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
             <p className="font-mono text-2xl font-bold text-foreground">#{rank}</p>
           </div>
           <div className="rounded-2xl border border-accent/40 bg-accent/10 p-4">
-            <p className="text-xs text-accent">Total power</p>
-            <p className="font-mono text-2xl font-bold text-accent">{totalPower.toLocaleString("en-US")}</p>
+            <p className="text-xs text-accent">Votes</p>
+            <p className="font-mono text-2xl font-bold text-accent">{voteCount.toLocaleString("en-US")}</p>
           </div>
           <div className="col-span-2 rounded-2xl border border-border bg-surface p-4 sm:col-span-1">
             <p className="text-xs text-muted-2">Last 7 days</p>
@@ -144,19 +128,6 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
             >
               {weeklyChange > 0 ? `↑${weeklyChange}` : weeklyChange < 0 ? `↓${Math.abs(weeklyChange)}` : "—"}
             </p>
-          </div>
-        </div>
-
-        {/* AŞAMA 5: "Starting score / Votes / Total power" breakdown,
-            required to be shown distinctly on every country's page. */}
-        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-surface p-4 text-center">
-          <div>
-            <p className="text-xs text-muted-2">Starting score</p>
-            <p className="font-mono text-lg font-semibold text-foreground">{startingScore.toLocaleString("en-US")}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-2">Real votes</p>
-            <p className="font-mono text-lg font-semibold text-foreground">{voteCount.toLocaleString("en-US")}</p>
           </div>
         </div>
 
