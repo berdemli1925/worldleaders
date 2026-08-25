@@ -63,6 +63,19 @@ export default function ThroneClaimModal({
   // the reason and nothing else rather than let a doomed submit happen.
   const betaBlocked = !PAYMENTS_ENABLED && !isVacant(throne);
 
+  // memleket.lol-style fork shown before the form on an occupied throne
+  // (paid mode only — beta never reaches this, see betaBlocked above):
+  // "reclaim" vs "new leader". Both lead to the exact same form underneath
+  // — there's no separate code path or special price, since credit already
+  // applies automatically based on whichever profile ends up linked (see
+  // scripts/setup-persistent-leader-credit.mjs) — this is purely about
+  // setting the right expectation up front rather than burying it in a
+  // caption, same as why the "Currently held by…" credit note above
+  // exists. null until one is picked; irrecoverable back to null on close
+  // since the modal remounts fresh next time it opens.
+  const [claimIntent, setClaimIntent] = useState<"reclaim" | "new" | null>(null);
+  const showIntroChoice = PAYMENTS_ENABLED && !isVacant(throne) && claimIntent === null;
+
   // Leader identity — who's claiming — kept entirely separate from the X
   // post below, which is just content and doesn't have to be this
   // person's own post. See src/lib/social-links.ts.
@@ -84,6 +97,17 @@ export default function ThroneClaimModal({
   const [brandTitle, setBrandTitle] = useState("");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+
+  // Optional "auto-fill from a link" affordance (memleket.lol calls this
+  // "Bilgileri Çek") — a site/X/Instagram URL whose title/description/
+  // og:image get pulled in to save typing the three fields above by hand.
+  // Kept separate from tweetUrl (which is required and about *content to
+  // display*, not identity) — linkUrl is optional and, once fetched, also
+  // gets stored on the claim itself (throne.linkUrl — see ThronePanel's
+  // fallback link for a leader with no social identity set).
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkFetchStatus, setLinkFetchStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [linkFetchError, setLinkFetchError] = useState<string | null>(null);
 
   const [previewStatus, setPreviewStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -145,6 +169,28 @@ export default function ThroneClaimModal({
     }
   }
 
+  async function handleFetchLinkInfo() {
+    if (!linkUrl.trim()) return;
+    setLinkFetchStatus("loading");
+    setLinkFetchError(null);
+    try {
+      const res = await fetch("/api/throne/link-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: linkUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data?.error ?? "Couldn't fetch that link.");
+      if (data.title) setBrandTitle(data.title);
+      if (data.description) setDescription(data.description);
+      if (data.imageUrl) setLogoUrl(data.imageUrl);
+      setLinkFetchStatus("ok");
+    } catch (err) {
+      setLinkFetchError(err instanceof Error ? err.message : "Couldn't fetch that link.");
+      setLinkFetchStatus("error");
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setSubmitting(true);
@@ -168,6 +214,7 @@ export default function ThroneClaimModal({
           brandTitle: brandTitle || undefined,
           description: description || undefined,
           logoUrl: logoUrl || undefined,
+          linkUrl: linkUrl.trim() || undefined,
           leaderXUrl: leaderXUrl.trim() || undefined,
           leaderInstagramUrl: leaderInstagramUrl.trim() || undefined,
           leaderTiktokUrl: leaderTiktokUrl.trim() || undefined,
@@ -228,10 +275,14 @@ export default function ThroneClaimModal({
               throne?.currentValue !== null && throne?.handle ? (
                 <p className="mt-1 text-xs text-muted">
                   Currently held by @{throne.handle} for {formatMoney(throne.currentValue ?? 0)} — minimum to take it
-                  is {formatMoney(minimum)}.
+                  is {formatMoney(minimum)}. If you&apos;ve ever led this country before under the same profile,
+                  everything you paid in still counts as credit — no time limit — so you&apos;d owe less.
                 </p>
               ) : (
-                <p className="mt-1 text-xs text-muted">Vacant — base price is {formatMoney(minimum)}.</p>
+                <p className="mt-1 text-xs text-muted">
+                  Vacant — base price is {formatMoney(minimum)}. Past credit under your profile (if any) still
+                  applies here too.
+                </p>
               )
             ) : betaBlocked ? (
               <p className="mt-1 text-xs text-muted">
@@ -257,8 +308,39 @@ export default function ThroneClaimModal({
           >
             Close
           </button>
+        ) : showIntroChoice ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted">How are you claiming this one?</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setClaimIntent("reclaim")}
+                className="flex flex-1 flex-col gap-1 rounded-xl border border-accent/40 bg-accent/10 p-3 text-left transition-colors hover:bg-accent/20"
+              >
+                <span className="text-sm font-medium text-accent">I&apos;ve led this country before</span>
+                <span className="text-xs text-muted">
+                  Link the same profile you used previously and whatever you already paid for it counts as credit
+                  automatically — no time limit.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setClaimIntent("new")}
+                className="flex flex-1 flex-col gap-1 rounded-xl border border-border bg-black/15 p-3 text-left transition-colors hover:bg-surface-hover"
+              >
+                <span className="text-sm font-medium text-foreground">Claim as a new leader</span>
+                <span className="text-xs text-muted">Starting fresh — same form either way, just no past credit to expect.</span>
+              </button>
+            </div>
+          </div>
         ) : (
           <>
+            {claimIntent === "reclaim" && (
+              <p className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
+                Link the same X/Instagram/TikTok/Facebook profile you led with before below — that&apos;s what your
+                credit is tied to, not which post you show.
+              </p>
+            )}
             <p className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
               {PAYMENTS_ENABLED
                 ? "Test mode — no real payment happens. This just records the claim for testing."
@@ -307,6 +389,42 @@ export default function ThroneClaimModal({
                   the leader's own. */}
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-medium text-foreground">Content</p>
+                <p className="text-xs text-muted-2">
+                  No direct photo upload — your image comes from a real X post. Post it (or find a public one you
+                  want to use) and link it below; if it has a photo, you&apos;ll be able to position it on the map next.
+                </p>
+
+                {/* Optional shortcut — pull brand/description/logo from a
+                    site or profile link instead of typing the three fields
+                    below by hand. */}
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-muted">Auto-fill from your site/profile (optional)</span>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={linkUrl}
+                      onChange={(event) => {
+                        setLinkUrl(event.target.value);
+                        setLinkFetchStatus("idle");
+                      }}
+                      placeholder="https://yoursite.com or https://x.com/you"
+                      className="min-w-0 flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleFetchLinkInfo}
+                      disabled={!linkUrl.trim() || linkFetchStatus === "loading"}
+                      className="shrink-0 rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {linkFetchStatus === "loading" ? "Fetching…" : "Fetch info"}
+                    </button>
+                  </div>
+                  {linkFetchStatus === "error" && <span className="text-xs text-danger">{linkFetchError}</span>}
+                  {linkFetchStatus === "ok" && (
+                    <span className="text-xs text-muted-2">Brand/description/logo below filled in — edit anything before submitting.</span>
+                  )}
+                </label>
+
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="text-muted">X post to display — required, any public post</span>
                   <input

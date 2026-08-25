@@ -6,6 +6,8 @@ import {
   clampImageCrop,
   computeImageRect,
   DEFAULT_IMAGE_CROP,
+  MAX_IMAGE_CROP_SCALE,
+  minImageCropScale,
   type ImageCropTransform,
   type Size,
 } from "@/lib/image-crop";
@@ -22,6 +24,14 @@ interface DragState {
 }
 
 const WHEEL_ZOOM_FACTOR = 1.08;
+// A country's silhouette can be tiny on a phone screen — too small to
+// pinch inside accurately — so the +/- buttons and slider below need a
+// bigger per-tap step than the wheel gets per notch to actually be usable
+// as the primary zoom control there, not just a fallback.
+const BUTTON_ZOOM_FACTOR = 1.25;
+// Fine enough that dragging the slider across its full range takes a
+// deliberate sweep rather than jumping in a couple of visible steps.
+const SLIDER_STEP = 0.01;
 
 function dist(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -195,6 +205,7 @@ export default function ImagePositioner({
 
   const rect = imageSize ? computeImageRect(box, imageSize, value) : null;
   const canReset = value.scale !== 1 || value.offsetX !== 0 || value.offsetY !== 0;
+  const minScale = imageSize ? minImageCropScale(box, imageSize) : 1;
 
   return (
     <div className="flex flex-col gap-2">
@@ -241,8 +252,49 @@ export default function ImagePositioner({
         )}
       </div>
 
+      {/* Explicit zoom controls, not just pinch/scroll — a claimed country's
+          shape is often tiny on a phone screen, too small to pinch inside
+          accurately, so this is the primary way to zoom on mobile rather
+          than a fallback. The slider's own range communicates the new
+          "zoom out past cover" ability directly: its low end now sits at
+          minScale (full photo visible, gaps allowed) instead of always
+          starting pinned at cover-fit. */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Zoom out"
+          onClick={() => zoomBy(1 / BUTTON_ZOOM_FACTOR)}
+          disabled={!imageSize}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-sm leading-none text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          −
+        </button>
+        <input
+          type="range"
+          aria-label="Zoom"
+          min={minScale}
+          max={MAX_IMAGE_CROP_SCALE}
+          step={SLIDER_STEP}
+          value={value.scale}
+          disabled={!imageSize}
+          onChange={(event) => applyTransform({ ...latestValue.current, scale: Number(event.target.value) })}
+          className="h-1.5 flex-1 accent-accent disabled:opacity-40"
+        />
+        <button
+          type="button"
+          aria-label="Zoom in"
+          onClick={() => zoomBy(BUTTON_ZOOM_FACTOR)}
+          disabled={!imageSize}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-sm leading-none text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          +
+        </button>
+      </div>
+
       <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-2">Drag to reposition, scroll or pinch to zoom.</p>
+        <p className="text-xs text-muted-2">
+          Drag to reposition. Zoom out to shrink the photo below the country&apos;s shape — gaps are fine.
+        </p>
         <button
           type="button"
           onClick={() => applyTransform(DEFAULT_IMAGE_CROP)}
