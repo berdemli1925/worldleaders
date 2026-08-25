@@ -293,7 +293,23 @@ export default function Leaderboard({
   // spot to new instead of jumping.
   const cardRefs = useRef(new Map<string, HTMLElement>());
   const prevPosByIso = useRef(new Map<string, { top: number; left: number }>());
+  const prevOrderKey = useRef<string | null>(null);
   useLayoutEffect(() => {
+    // `visible` is a fresh array *reference* on every render — search,
+    // filters, and anything wholly unrelated (the Hype countdown ticking
+    // once a second) all recompute it even when the actual card order
+    // hasn't changed. Without this guard, the measure-and-animate work
+    // below ran on every single one of those renders, and
+    // getBoundingClientRect()'s sub-pixel rounding almost never repeats
+    // exactly between two such runs — so instead of one clean slide when
+    // something really reorders, every card got a constant, tiny
+    // transform+transition every second, which reads as restless jitter
+    // rather than smooth. Only actually run it when the visible ISO
+    // order itself changed.
+    const orderKey = visible.map((row) => row.entry.isoCode).join("|");
+    if (orderKey === prevOrderKey.current) return;
+    prevOrderKey.current = orderKey;
+
     const nextPosByIso = new Map<string, { top: number; left: number }>();
     cardRefs.current.forEach((el, iso) => {
       const rect = el.getBoundingClientRect();
