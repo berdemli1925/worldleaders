@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect } from "react";
 
+import { CTA_CLASSES } from "@/lib/cta-style";
+
 // Error boundaries must be Client Components. Wraps everything under the
 // root layout (nav/footer still render normally — this only replaces
 // page content) — see global-error.tsx for the root-layout-itself case.
@@ -22,7 +24,7 @@ export default function Error({ error, retry }: { error: Error & { digest?: stri
         <button
           type="button"
           onClick={() => retry()}
-          className="rounded-sm bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110"
+          className={`px-4 py-2 text-sm font-bold uppercase tracking-wide ${CTA_CLASSES}`}
         >
           Try again
         </button>

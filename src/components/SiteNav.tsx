@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import Logo from "@/components/Logo";
 import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
+import { CTA_CLASSES } from "@/lib/cta-style";
 
 const LINKS = [
   { href: "/", label: "Rankings" },
@@ -45,7 +46,7 @@ export default function SiteNav() {
                 aria-current={isActive ? "page" : undefined}
                 className={
                   isActive
-                    ? "rounded-sm bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground"
+                    ? `px-3 py-1.5 text-sm font-medium ${CTA_CLASSES}`
                     : "rounded-sm px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
                 }
               >
@@ -82,7 +83,7 @@ export default function SiteNav() {
                 onClick={() => setMobileOpen(false)}
                 className={
                   isActive
-                    ? "rounded-sm bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
+                    ? `px-3 py-2 text-sm font-medium ${CTA_CLASSES}`
                     : "rounded-sm px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
                 }
               >

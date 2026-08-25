@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CTA_CLASSES } from "@/lib/cta-style";
+
 export default function AdminLoginForm() {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -50,7 +52,7 @@ export default function AdminLoginForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-sm bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+        className={`px-4 py-2 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-60 ${CTA_CLASSES}`}
       >
         {submitting ? "Signing in…" : "Sign in"}
       </button>

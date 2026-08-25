@@ -11,7 +11,7 @@
 // obviously land, not a shade away from the sea. See gelistirme-plani-v2.md
 // AŞAMA 1.5.
 const LIGHT: [number, number, number] = [62, 78, 102]; // muted steel-blue
-const DARK: [number, number, number] = [156, 90, 31]; // matches --accent
+const DARK: [number, number, number] = [179, 137, 44]; // matches --accent
 
 // A flat linear gradient between the same two endpoints voteCountToColor
 // interpolates between — for the map's color-key legend, not the map

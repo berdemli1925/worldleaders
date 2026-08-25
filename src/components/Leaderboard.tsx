@@ -7,6 +7,7 @@ import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
 import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
 import { getSlugForCountry } from "@/lib/country-slug";
+import { CTA_CLASSES } from "@/lib/cta-style";
 import { getFingerprint } from "@/lib/fingerprint";
 import type { SerializedMomentum } from "@/lib/momentum";
 import type { RankedCountry } from "@/lib/rank";
@@ -309,7 +310,7 @@ export default function Leaderboard({
               onClick={() => setPeriod(value)}
               className={
                 period === value
-                  ? "rounded-sm bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                  ? `px-3 py-1 text-sm font-medium ${CTA_CLASSES}`
                   : "rounded-sm border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
               }
             >
@@ -350,7 +351,7 @@ export default function Leaderboard({
             onClick={() => setLeaderFilter(value)}
             className={
               leaderFilter === value
-                ? "rounded-sm bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                ? `px-3 py-1 text-sm font-medium ${CTA_CLASSES}`
                 : "rounded-sm border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
             }
           >
@@ -371,7 +372,7 @@ export default function Leaderboard({
             title={value !== "votes" && value !== "cheapest" && !momentum ? "Loading…" : undefined}
             className={
               sortMode === value
-                ? "rounded-sm bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                ? `px-3 py-1 text-sm font-medium ${CTA_CLASSES}`
                 : "rounded-sm border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
             }
           >
@@ -390,7 +391,7 @@ export default function Leaderboard({
             onClick={() => setContinent(option)}
             className={
               continent === option
-                ? "rounded-sm bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                ? `px-3 py-1 text-sm font-medium ${CTA_CLASSES}`
                 : "rounded-sm border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
             }
           >
@@ -509,7 +510,7 @@ export default function Leaderboard({
                     onVote(entry.isoCode);
                   }}
                   disabled={submitting || votedHere}
-                  className="flex-1 rounded-sm bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+                  className={`flex-1 px-3 py-2 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-hover disabled:text-muted ${CTA_CLASSES}`}
                 >
                   {voteLabel}
                 </button>

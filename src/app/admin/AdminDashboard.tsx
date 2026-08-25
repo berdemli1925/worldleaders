@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CTA_CLASSES } from "@/lib/cta-style";
+
 export interface ActiveLeader {
   country: string;
   claimId: number;
@@ -239,7 +241,7 @@ export default function AdminDashboard({
               setBlockHandleInput("");
               setBlockReasonInput("");
             }}
-            className="rounded-sm bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-60 ${CTA_CLASSES}`}
           >
             Block
           </button>
