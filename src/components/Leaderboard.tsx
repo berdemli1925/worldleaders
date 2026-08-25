@@ -437,6 +437,11 @@ export default function Leaderboard({
           // ClosestBattles' hover preview.
           const previewText = throne?.postText || throne?.description || null;
           const previewImage = throne?.postImageUrl ? twitterImageVariant(throne.postImageUrl, "small") : null;
+          // Full-size, uncropped version for the expanded view below — the
+          // "small" variant above is fine for the tiny always-visible
+          // square thumbnail, but direct request: expanding should show
+          // the *entire* posted photo, not a cropped slice of it.
+          const previewImageLarge = throne?.postImageUrl ? twitterImageVariant(throne.postImageUrl, "orig") : null;
           const href = `/${getSlugForCountry(entry.isoCode) ?? entry.isoCode.toLowerCase()}`;
           const isExpanded = expandedIsos.has(entry.isoCode);
 
@@ -527,15 +532,24 @@ export default function Leaderboard({
               {/* The card grows downward to show it, rather than a floating
                   popup — "aşağı doğru kart büyüsün ... twit kart boyutuna
                   yakın bir pencerede görüntülenebilsin." Several cards can
-                  be open at once (expandedIsos is a Set), each independent. */}
-              {isExpanded && (previewImage || previewText) && (
+                  be open at once (expandedIsos is a Set), each independent.
+                  The image is shown whole — no fixed-height object-cover
+                  crop (that was cutting off parts of the actual photo,
+                  direct complaint) — just capped at a max height so a very
+                  tall/portrait post can't blow up the page; anything
+                  shorter than the cap shows at its own natural size. */}
+              {isExpanded && (previewImageLarge || previewText) && (
                 <div
                   className="w-full border border-border bg-black/20 p-3"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  {previewImage && (
+                  {previewImageLarge && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={previewImage} alt="" className="mb-2 h-48 w-full rounded-sm object-cover sm:h-56" />
+                    <img
+                      src={previewImageLarge}
+                      alt=""
+                      className="mb-2 max-h-[420px] w-full rounded-sm object-contain"
+                    />
                   )}
                   {previewText && <p className="text-left text-xs italic text-muted">&ldquo;{previewText}&rdquo;</p>}
                 </div>
