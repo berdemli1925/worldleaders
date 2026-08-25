@@ -9,6 +9,7 @@ import { getCountryMeta } from "@/lib/country-meta";
 import { getSlugForCountry } from "@/lib/country-slug";
 import { CTA_CLASSES } from "@/lib/cta-style";
 import { getFingerprint } from "@/lib/fingerprint";
+import type { HypeEntry } from "@/lib/hype";
 import type { SerializedMomentum } from "@/lib/momentum";
 import type { RankedCountry } from "@/lib/rank";
 import {
@@ -24,6 +25,7 @@ import { twitterImageVariant } from "@/lib/twitter-image";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import ClaimThroneButton from "./ClaimThroneButton";
 import Flag from "./Flag";
+import HypeModal from "./HypeModal";
 import ThroneClaimModal from "./ThroneClaimModal";
 import type { CountryPath } from "./WorldMapInteractive";
 
@@ -51,6 +53,11 @@ interface LeaderboardProps {
   countries: CountryPath[];
   /** Refetches throne state after a claim completes — same callback Hero/WorldMapInteractive already use. */
   onThroneClaimed: () => void;
+  /** Current global hype state and its refetch — same data ThronePanel's Hype button uses. See src/lib/hype.ts. */
+  hype: HypeEntry | null;
+  onHyped: () => void;
+  /** Shared "now" clock — same one every other countdown on the page reads. Needed here now that a card can open HypeModal, which needs it to tell an active hype from an expired one. */
+  now: number | null;
 }
 
 const CONTINENTS = ["All", "Europe", "Asia", "Africa", "Americas", "Oceania"] as const;
@@ -105,6 +112,9 @@ export default function Leaderboard({
   onShareBonusGranted,
   countries,
   onThroneClaimed,
+  hype,
+  onHyped,
+  now,
 }: LeaderboardProps) {
   const router = useRouter();
   const countryByAlpha2 = useMemo(() => buildCountryByAlpha2(countries), [countries]);
@@ -112,6 +122,10 @@ export default function Leaderboard({
   // button opens this directly rather than routing through the map, so a
   // claim can happen without ever leaving the leaderboard grid.
   const [claimIso, setClaimIso] = useState<string | null>(null);
+  // Same idea, for the Hype modal — only ever offered on a card that
+  // already has a leader (see the button below), same eligibility check
+  // ThronePanel's own Hype button relies on.
+  const [hypeIso, setHypeIso] = useState<string | null>(null);
   // Which cards have their leader's post expanded inline — direct request:
   // tapping the small leader thumbnail should NOT navigate to the country
   // page (a hover-only preview doesn't work on touch anyway), it should
@@ -572,8 +586,22 @@ export default function Leaderboard({
                 </button>
               </div>
 
-              <div className="w-full" onClick={(event) => event.stopPropagation()}>
-                <ClaimThroneButton throne={throne} onOpenClaim={() => setClaimIso(entry.isoCode)} className="w-full" />
+              <div className="flex w-full items-center gap-2" onClick={(event) => event.stopPropagation()}>
+                {/* Only offered once the country has a leader — hyping
+                    puts what's already on the throne card in the map-top
+                    spotlight, there's nothing to hype on a vacant one.
+                    Same eligibility check as ThronePanel's Hype button
+                    (server-side, by fingerprint, in beta). */}
+                {hasLeader && (
+                  <button
+                    type="button"
+                    onClick={() => setHypeIso(entry.isoCode)}
+                    className="shrink-0 border border-cta-border px-3 py-2 text-xs font-bold uppercase tracking-wide text-cta-border transition-colors hover:bg-cta-border/10"
+                  >
+                    🔥
+                  </button>
+                )}
+                <ClaimThroneButton throne={throne} onOpenClaim={() => setClaimIso(entry.isoCode)} className="flex-1" />
               </div>
             </div>
           );
@@ -611,6 +639,21 @@ export default function Leaderboard({
               countryBounds={country?.bounds}
               onClose={() => setClaimIso(null)}
               onClaimed={onThroneClaimed}
+            />
+          );
+        })()}
+
+      {hypeIso &&
+        (() => {
+          const meta = getCountryMeta(hypeIso);
+          return (
+            <HypeModal
+              isoCode={hypeIso}
+              countryName={meta?.name ?? hypeIso}
+              hype={hype}
+              now={now}
+              onClose={() => setHypeIso(null)}
+              onHyped={onHyped}
             />
           );
         })()}
