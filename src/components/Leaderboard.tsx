@@ -112,6 +112,14 @@ export default function Leaderboard({
   // button opens this directly rather than routing through the map, so a
   // claim can happen without ever leaving the leaderboard grid.
   const [claimIso, setClaimIso] = useState<string | null>(null);
+  // Which cards have their leader's post expanded inline — direct request:
+  // tapping the small leader thumbnail should NOT navigate to the country
+  // page (a hover-only preview doesn't work on touch anyway), it should
+  // grow the card downward in place to show the post near-card-size, and
+  // tapping again collapses it back. A Set rather than one shared value so
+  // several cards can be open at once — checking a handful of countries'
+  // leaders one after another shouldn't collapse the previous one.
+  const [expandedIsos, setExpandedIsos] = useState<Set<string>>(new Set());
 
   // Opens an X share-intent window pre-filled with a link back to this
   // country (?country=XX, read by page.tsx's generateMetadata for the
@@ -416,10 +424,21 @@ export default function Leaderboard({
           const previewText = throne?.postText || throne?.description || null;
           const previewImage = throne?.postImageUrl ? twitterImageVariant(throne.postImageUrl, "small") : null;
           const href = `/${getSlugForCountry(entry.isoCode) ?? entry.isoCode.toLowerCase()}`;
+          const isExpanded = expandedIsos.has(entry.isoCode);
 
           const openCountry = () => {
             onSelectCountry(entry.isoCode);
             router.push(href);
+          };
+
+          const toggleExpanded = (event: React.MouseEvent) => {
+            event.stopPropagation();
+            setExpandedIsos((prev) => {
+              const next = new Set(prev);
+              if (next.has(entry.isoCode)) next.delete(entry.isoCode);
+              else next.add(entry.isoCode);
+              return next;
+            });
           };
 
           return (
@@ -459,44 +478,54 @@ export default function Leaderboard({
               {/* Leadership — a crown (solid when held, faded/desaturated
                   when vacant, so it reads at a glance) plus a small,
                   always-visible thumbnail of what the leader posted (their
-                  own post image, falling back to their avatar/logo) — not
-                  just their name — so there's actually something to look at
-                  before hovering. Hovering enlarges it into a readable
-                  preview (image + full quoted text), same interaction
-                  Closest Battles' cards use. */}
-              <div
-                className="group/leader relative flex items-center gap-2 text-xs"
-                onClick={(event) => event.stopPropagation()}
-              >
+                  own post image, falling back to their avatar/logo). Direct
+                  request: tapping the thumbnail must NOT open the country
+                  page (a hover-only preview doesn't work on touch anyway) —
+                  it toggles the card open in place instead, see the
+                  expanded block below. */}
+              <div className="flex items-center gap-2 text-xs" onClick={(event) => event.stopPropagation()}>
                 <span aria-hidden="true" className={hasLeader ? "text-sm" : "text-sm opacity-30 grayscale"}>
                   👑
                 </span>
                 {(previewImage || leaderAvatar) && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={previewImage || (leaderAvatar as string)}
-                    alt=""
-                    className="h-14 w-14 rounded-md border border-accent object-cover"
-                  />
+                  <button
+                    type="button"
+                    onClick={toggleExpanded}
+                    aria-expanded={isExpanded}
+                    aria-label={isExpanded ? "Hide their post" : "Show their post"}
+                    className="shrink-0"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={previewImage || (leaderAvatar as string)}
+                      alt=""
+                      className="h-14 w-14 rounded-md border border-accent object-cover"
+                    />
+                  </button>
                 )}
                 {hasLeader ? (
                   <span className="max-w-[120px] truncate text-accent">{leaderName}</span>
                 ) : (
                   <span className="text-muted-2">No leader</span>
                 )}
-
-                {hasLeader && (previewText || previewImage) && (
-                  <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 max-w-[80vw] -translate-x-1/2 rounded-md border border-border bg-surface p-3 opacity-0 shadow-xl transition-opacity duration-150 group-hover/leader:opacity-100">
-                    {previewImage && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={previewImage} alt="" className="mb-2 h-24 w-full rounded-sm object-cover" />
-                    )}
-                    {previewText && (
-                      <p className="line-clamp-4 text-left text-xs italic text-muted">&ldquo;{previewText}&rdquo;</p>
-                    )}
-                  </div>
-                )}
               </div>
+
+              {/* The card grows downward to show it, rather than a floating
+                  popup — "aşağı doğru kart büyüsün ... twit kart boyutuna
+                  yakın bir pencerede görüntülenebilsin." Several cards can
+                  be open at once (expandedIsos is a Set), each independent. */}
+              {isExpanded && (previewImage || previewText) && (
+                <div
+                  className="w-full border border-border bg-black/20 p-3"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {previewImage && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={previewImage} alt="" className="mb-2 h-48 w-full rounded-sm object-cover sm:h-56" />
+                  )}
+                  {previewText && <p className="text-left text-xs italic text-muted">&ldquo;{previewText}&rdquo;</p>}
+                </div>
+              )}
 
               <p className="font-mono text-lg font-bold text-foreground">
                 {entry.voteCount.toLocaleString("en-US")}
