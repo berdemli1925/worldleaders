@@ -481,8 +481,40 @@ export default function Leaderboard({
                 highlightedIso === entry.isoCode ? "border-accent ring-2 ring-accent" : "border-border"
               }`}
             >
+              {/* Direct request: share moved here, top-left of the card
+                  (was down next to Vote) — a small icon-only button, first
+                  thing in the top row, ahead of the rank number. */}
               <div className="flex w-full items-start justify-between">
-                <span className="font-mono text-sm text-muted">#{index + 1}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleShareOnX(entry.isoCode, entry.name, index + 1);
+                    }}
+                    aria-label={`Share ${entry.name} on X`}
+                    title="Share on X"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-border text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width={12}
+                      height={12}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="18" cy="5" r="3" />
+                      <circle cx="6" cy="12" r="3" />
+                      <circle cx="18" cy="19" r="3" />
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                    </svg>
+                  </button>
+                  <span className="font-mono text-sm text-muted">#{index + 1}</span>
+                </div>
                 {change !== null && change !== 0 && (
                   <span className={`font-mono text-xs ${change > 0 ? "text-success" : "text-danger"}`}>
                     {change > 0 ? "↑" : "↓"}
@@ -491,7 +523,22 @@ export default function Leaderboard({
                 )}
               </div>
 
-              <Flag alpha2={entry.isoCode} width={56} />
+              {/* Direct request: Hype button right next to the flag. */}
+              <div className="flex items-center justify-center gap-2">
+                <Flag alpha2={entry.isoCode} width={56} />
+                {hasLeader && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setHypeIso(entry.isoCode);
+                    }}
+                    className="shrink-0 border border-cta-border px-2 py-1 text-xs font-bold uppercase tracking-wide text-cta-border transition-colors hover:bg-cta-border/10"
+                  >
+                    🔥
+                  </button>
+                )}
+              </div>
               <p className="w-full truncate text-base font-semibold text-foreground">{entry.name}</p>
 
               {/* Leadership — a crown (solid when held, faded/desaturated
@@ -559,63 +606,20 @@ export default function Leaderboard({
                 {entry.voteCount.toLocaleString("en-US")}
               </p>
 
-              <div className="flex w-full items-center gap-2">
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onVote(entry.isoCode);
-                  }}
-                  disabled={submitting || votedHere}
-                  className={`flex-1 px-3 py-2 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-hover disabled:text-muted ${CTA_CLASSES}`}
-                >
-                  {voteLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleShareOnX(entry.isoCode, entry.name, index + 1);
-                  }}
-                  aria-label={`Share ${entry.name} on X`}
-                  title="Share on X"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-border text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    width={13}
-                    height={13}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="18" cy="5" r="3" />
-                    <circle cx="6" cy="12" r="3" />
-                    <circle cx="18" cy="19" r="3" />
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                  </svg>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onVote(entry.isoCode);
+                }}
+                disabled={submitting || votedHere}
+                className={`w-full px-3 py-2 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-hover disabled:text-muted ${CTA_CLASSES}`}
+              >
+                {voteLabel}
+              </button>
 
-              <div className="flex w-full items-center gap-2" onClick={(event) => event.stopPropagation()}>
-                {/* Only offered once the country has a leader — hyping
-                    puts what's already on the throne card in the map-top
-                    spotlight, there's nothing to hype on a vacant one.
-                    Same eligibility check as ThronePanel's Hype button
-                    (server-side, by fingerprint, in beta). */}
-                {hasLeader && (
-                  <button
-                    type="button"
-                    onClick={() => setHypeIso(entry.isoCode)}
-                    className="shrink-0 border border-cta-border px-3 py-2 text-xs font-bold uppercase tracking-wide text-cta-border transition-colors hover:bg-cta-border/10"
-                  >
-                    🔥
-                  </button>
-                )}
-                <ClaimThroneButton throne={throne} onOpenClaim={() => setClaimIso(entry.isoCode)} className="flex-1" />
+              <div className="w-full" onClick={(event) => event.stopPropagation()}>
+                <ClaimThroneButton throne={throne} onOpenClaim={() => setClaimIso(entry.isoCode)} className="w-full" />
               </div>
             </div>
           );
