@@ -60,7 +60,7 @@ export default function ClosestBattles({ entries, thrones, submittingIso, onVote
         {battles.map(({ first, second, gap }) => (
           <div
             key={`${first.isoCode}-${second.isoCode}`}
-            className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5"
+            className="flex flex-col gap-4 rounded-md border border-border bg-surface p-5"
           >
             {[first, second].map((side, index) => {
               const throne = throneByIso.get(side.isoCode);
@@ -78,7 +78,7 @@ export default function ClosestBattles({ entries, thrones, submittingIso, onVote
                   <button
                     type="button"
                     onClick={() => onSelectCountry(side.isoCode)}
-                    className="group/leader relative flex w-full items-center gap-3 rounded-xl px-1.5 py-2 text-left transition-colors hover:bg-surface-hover"
+                    className="group/leader relative flex w-full items-center gap-3 rounded-md px-1.5 py-2 text-left transition-colors hover:bg-surface-hover"
                   >
                     <Flag alpha2={side.isoCode} width={40} />
                     <span className="min-w-0 flex-1">
@@ -120,7 +120,7 @@ export default function ClosestBattles({ entries, thrones, submittingIso, onVote
                         event.stopPropagation();
                         onVote(side.isoCode);
                       }}
-                      className="shrink-0 rounded-full bg-accent/15 px-3.5 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
+                      className="shrink-0 rounded-sm bg-accent/15 px-3.5 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
                     >
                       {submitting ? "…" : "Vote"}
                     </span>
@@ -130,13 +130,13 @@ export default function ClosestBattles({ entries, thrones, submittingIso, onVote
                         görüntülensin" — the leader's post/message,
                         CSS-only (no extra fetch), shown above the row. */}
                     {hasLeader && (previewText || previewImage) && (
-                      <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-72 max-w-[85vw] rounded-xl border border-border bg-surface p-3 opacity-0 shadow-xl transition-opacity duration-150 group-hover/leader:opacity-100">
+                      <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-72 max-w-[85vw] rounded-md border border-border bg-surface p-3 opacity-0 shadow-xl transition-opacity duration-150 group-hover/leader:opacity-100">
                         {previewImage && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={previewImage}
                             alt=""
-                            className="mb-2 h-28 w-full rounded-lg object-cover"
+                            className="mb-2 h-28 w-full rounded-sm object-cover"
                           />
                         )}
                         {previewText && (

@@ -309,8 +309,8 @@ export default function Leaderboard({
               onClick={() => setPeriod(value)}
               className={
                 period === value
-                  ? "rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
-                  : "rounded-full border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
+                  ? "rounded-sm bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                  : "rounded-sm border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
               }
             >
               {label}
@@ -331,7 +331,7 @@ export default function Leaderboard({
           onSelectCountry(filtered[0].entry.isoCode);
         }}
         placeholder="Search by country name or ISO code"
-        className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent"
+        className="w-full rounded-sm border border-border bg-surface px-4 py-2.5 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent"
       />
 
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter by leader status">
@@ -350,8 +350,8 @@ export default function Leaderboard({
             onClick={() => setLeaderFilter(value)}
             className={
               leaderFilter === value
-                ? "rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
-                : "rounded-full border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
+                ? "rounded-sm bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                : "rounded-sm border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
             }
           >
             {label}
@@ -371,8 +371,8 @@ export default function Leaderboard({
             title={value !== "votes" && value !== "cheapest" && !momentum ? "Loading…" : undefined}
             className={
               sortMode === value
-                ? "rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
-                : "rounded-full border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                ? "rounded-sm bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                : "rounded-sm border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
             }
           >
             {label}
@@ -390,8 +390,8 @@ export default function Leaderboard({
             onClick={() => setContinent(option)}
             className={
               continent === option
-                ? "rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
-                : "rounded-full border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
+                ? "rounded-sm bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
+                : "rounded-sm border border-border px-3 py-1 text-sm text-muted transition-colors hover:bg-surface-hover"
             }
           >
             {option}
@@ -438,7 +438,7 @@ export default function Leaderboard({
                   openCountry();
                 }
               }}
-              className={`relative flex cursor-pointer flex-col items-center gap-3 rounded-2xl border bg-surface p-5 text-center transition-colors hover:bg-surface-hover ${
+              className={`relative flex cursor-pointer flex-col items-center gap-3 rounded-md border bg-surface p-5 text-center transition-colors hover:bg-surface-hover ${
                 highlightedIso === entry.isoCode ? "border-accent ring-2 ring-accent" : "border-border"
               }`}
             >
@@ -485,10 +485,10 @@ export default function Leaderboard({
                 )}
 
                 {hasLeader && (previewText || previewImage) && (
-                  <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 max-w-[80vw] -translate-x-1/2 rounded-xl border border-border bg-surface p-3 opacity-0 shadow-xl transition-opacity duration-150 group-hover/leader:opacity-100">
+                  <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 max-w-[80vw] -translate-x-1/2 rounded-md border border-border bg-surface p-3 opacity-0 shadow-xl transition-opacity duration-150 group-hover/leader:opacity-100">
                     {previewImage && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={previewImage} alt="" className="mb-2 h-24 w-full rounded-lg object-cover" />
+                      <img src={previewImage} alt="" className="mb-2 h-24 w-full rounded-sm object-cover" />
                     )}
                     {previewText && (
                       <p className="line-clamp-4 text-left text-xs italic text-muted">&ldquo;{previewText}&rdquo;</p>
@@ -509,7 +509,7 @@ export default function Leaderboard({
                     onVote(entry.isoCode);
                   }}
                   disabled={submitting || votedHere}
-                  className="flex-1 rounded-full bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+                  className="flex-1 rounded-sm bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
                 >
                   {voteLabel}
                 </button>
@@ -521,7 +521,7 @@ export default function Leaderboard({
                   }}
                   aria-label={`Share ${entry.name} on X`}
                   title="Share on X"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-border text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -550,7 +550,7 @@ export default function Leaderboard({
         })}
 
         {filtered.length === 0 && (
-          <p className="col-span-full rounded-2xl border border-border bg-surface px-4 py-8 text-center text-sm text-muted">
+          <p className="col-span-full rounded-md border border-border bg-surface px-4 py-8 text-center text-sm text-muted">
             No countries match these filters.
           </p>
         )}
@@ -560,7 +560,7 @@ export default function Leaderboard({
         <button
           type="button"
           onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-          className="self-center rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-hover"
+          className="self-center rounded-sm border border-border bg-surface px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-hover"
         >
           Load more ({filtered.length - visibleCount} more)
         </button>

@@ -63,7 +63,7 @@ export default function LiveFeed({ recentVotes, claimHistory, countryNameByIso, 
   if (items.length === 0) return null;
 
   return (
-    <section className="flex w-full flex-col gap-2 rounded-2xl border border-border bg-surface p-4">
+    <section className="flex w-full flex-col gap-2 rounded-md border border-border bg-surface p-4">
       <div className="flex items-center gap-2">
         <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-success" aria-hidden="true" />
         <h2 className="text-sm font-semibold text-foreground">Live activity</h2>

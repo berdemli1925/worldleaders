@@ -209,7 +209,7 @@ export default function ImagePositioner({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="relative overflow-hidden rounded-xl border border-border bg-black/30">
+      <div className="relative overflow-hidden rounded-md border border-border bg-black/30">
         <svg
           ref={svgRef}
           viewBox={`${x0} ${y0} ${box.width} ${box.height}`}
@@ -265,7 +265,7 @@ export default function ImagePositioner({
           aria-label="Zoom out"
           onClick={() => zoomBy(1 / BUTTON_ZOOM_FACTOR)}
           disabled={!imageSize}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-sm leading-none text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-border text-sm leading-none text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           −
         </button>
@@ -285,7 +285,7 @@ export default function ImagePositioner({
           aria-label="Zoom in"
           onClick={() => zoomBy(BUTTON_ZOOM_FACTOR)}
           disabled={!imageSize}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-sm leading-none text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-border text-sm leading-none text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           +
         </button>
@@ -299,7 +299,7 @@ export default function ImagePositioner({
           type="button"
           onClick={() => applyTransform(DEFAULT_IMAGE_CROP)}
           disabled={!canReset}
-          className="rounded-full border border-border px-3 py-1 text-xs text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-sm border border-border px-3 py-1 text-xs text-muted transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           Reset position
         </button>

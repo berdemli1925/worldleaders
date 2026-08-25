@@ -8,7 +8,7 @@ interface TopBarProps {
 
 function StatBox({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
-    <div className="flex flex-1 flex-col gap-1 rounded-2xl border border-border bg-surface px-4 py-3">
+    <div className="flex flex-1 flex-col gap-1 rounded-md border border-border bg-surface px-4 py-3">
       <span className="text-xs text-muted-2">{label}</span>
       <span className={`text-xl font-semibold text-foreground ${mono ? "font-mono tabular-nums" : ""}`}>{value}</span>
     </div>

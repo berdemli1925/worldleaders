@@ -31,7 +31,7 @@ export default function LeadersList({ thrones }: LeadersListProps) {
 
   if (thrones.length === 0) {
     return (
-      <p className="rounded-2xl border border-border bg-surface px-4 py-12 text-center text-sm text-muted">
+      <p className="rounded-md border border-border bg-surface px-4 py-12 text-center text-sm text-muted">
         Nobody holds a throne right now — be the first from the rankings page.
       </p>
     );
@@ -42,7 +42,7 @@ export default function LeadersList({ thrones }: LeadersListProps) {
       {thrones.map((throne) => {
         const meta = getCountryMeta(throne.isoCode);
         return (
-          <article key={throne.isoCode} className="overflow-hidden rounded-2xl border border-border bg-surface">
+          <article key={throne.isoCode} className="overflow-hidden rounded-md border border-border bg-surface">
             <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
               <div className="flex items-center gap-3 sm:w-56 sm:shrink-0">
                 <Flag alpha2={throne.isoCode} width={32} />
@@ -68,7 +68,7 @@ export default function LeadersList({ thrones }: LeadersListProps) {
                   scale={throne.postImageScale}
                   offsetX={throne.postImageOffsetX}
                   offsetY={throne.postImageOffsetY}
-                  className="h-32 w-full shrink-0 rounded-xl sm:h-20 sm:w-32"
+                  className="h-32 w-full shrink-0 rounded-md sm:h-20 sm:w-32"
                 />
               )}
 

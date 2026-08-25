@@ -21,7 +21,7 @@ export default function PrivacyPage() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-8 rounded-2xl border border-border bg-surface p-6 text-sm text-muted">
+        <div className="flex flex-col gap-8 rounded-md border border-border bg-surface p-6 text-sm text-muted">
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold text-foreground">What we collect</h2>
             <ul className="list-inside list-disc space-y-1">

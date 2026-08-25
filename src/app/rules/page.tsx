@@ -23,7 +23,7 @@ export default function RulesPage() {
           <p className="max-w-xl text-sm text-muted">Voting, leadership, pricing, and refunds.</p>
         </div>
 
-        <div className="flex flex-col gap-8 rounded-2xl border border-border bg-surface p-6 text-sm text-muted">
+        <div className="flex flex-col gap-8 rounded-md border border-border bg-surface p-6 text-sm text-muted">
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold text-foreground">Voting</h2>
             <ul className="list-inside list-disc space-y-1">
@@ -40,7 +40,7 @@ export default function RulesPage() {
           </section>
 
           {!PAYMENTS_ENABLED && (
-            <section className="flex flex-col gap-2 rounded-xl border border-accent/30 bg-accent/10 p-4">
+            <section className="flex flex-col gap-2 rounded-md border border-accent/30 bg-accent/10 p-4">
               <h2 className="text-base font-semibold text-accent">Leadership is free during the beta</h2>
               <ul className="list-inside list-disc space-y-1">
                 <li>Claiming a country&apos;s throne costs nothing right now — no payment, no account.</li>

@@ -454,7 +454,7 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         onGuessedCountry={handleGuessedCountry}
       />
       <TopBar totalVotes={totalVotes} resetTarget={resetTarget} now={now} />
-      <div className="w-full rounded-2xl border border-border bg-surface p-4">
+      <div className="w-full rounded-md border border-border bg-surface p-4">
         <WorldMapInteractive
           ref={mapRef}
           countries={countries}

@@ -263,7 +263,7 @@ export default function ThroneClaimModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[90vh] w-full max-w-lg flex-col gap-5 overflow-y-auto rounded-2xl border border-border bg-surface p-5"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col gap-5 overflow-y-auto rounded-md border border-border bg-surface p-5"
         onClick={(event) => event.stopPropagation()}
       >
         {/* Status */}
@@ -304,7 +304,7 @@ export default function ThroneClaimModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-surface-hover px-4 py-2 text-sm font-medium text-foreground hover:brightness-110"
+            className="rounded-sm bg-surface-hover px-4 py-2 text-sm font-medium text-foreground hover:brightness-110"
           >
             Close
           </button>
@@ -315,7 +315,7 @@ export default function ThroneClaimModal({
               <button
                 type="button"
                 onClick={() => setClaimIntent("reclaim")}
-                className="flex flex-1 flex-col gap-1 rounded-xl border border-accent/40 bg-accent/10 p-3 text-left transition-colors hover:bg-accent/20"
+                className="flex flex-1 flex-col gap-1 rounded-md border border-accent/40 bg-accent/10 p-3 text-left transition-colors hover:bg-accent/20"
               >
                 <span className="text-sm font-medium text-accent">I&apos;ve led this country before</span>
                 <span className="text-xs text-muted">
@@ -326,7 +326,7 @@ export default function ThroneClaimModal({
               <button
                 type="button"
                 onClick={() => setClaimIntent("new")}
-                className="flex flex-1 flex-col gap-1 rounded-xl border border-border bg-black/15 p-3 text-left transition-colors hover:bg-surface-hover"
+                className="flex flex-1 flex-col gap-1 rounded-md border border-border bg-black/15 p-3 text-left transition-colors hover:bg-surface-hover"
               >
                 <span className="text-sm font-medium text-foreground">Claim as a new leader</span>
                 <span className="text-xs text-muted">Starting fresh — same form either way, just no past credit to expect.</span>
@@ -336,12 +336,12 @@ export default function ThroneClaimModal({
         ) : (
           <>
             {claimIntent === "reclaim" && (
-              <p className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
+              <p className="rounded-sm border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
                 Link the same X/Instagram/TikTok/Facebook profile you led with before below — that&apos;s what your
                 credit is tied to, not which post you show.
               </p>
             )}
-            <p className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
+            <p className="rounded-sm border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
               {PAYMENTS_ENABLED
                 ? "Test mode — no real payment happens. This just records the claim for testing."
                 : `Free during the beta. Claiming holds a country for ${BETA_HOLD_HOURS} hour — nobody can take it over until it expires. You can lead up to ${BETA_MAX_COUNTRIES_PER_USER} countries at once. This becomes a paid system later.`}
@@ -372,7 +372,7 @@ export default function ThroneClaimModal({
                         value={field.value}
                         onChange={(event) => field.setValue(event.target.value)}
                         placeholder={def?.placeholder}
-                        className={`rounded-full border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent ${
+                        className={`rounded-sm border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent ${
                           invalid ? "border-danger" : "border-border"
                         }`}
                       />
@@ -408,13 +408,13 @@ export default function ThroneClaimModal({
                         setLinkFetchStatus("idle");
                       }}
                       placeholder="https://yoursite.com or https://x.com/you"
-                      className="min-w-0 flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent"
+                      className="min-w-0 flex-1 rounded-sm border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent"
                     />
                     <button
                       type="button"
                       onClick={handleFetchLinkInfo}
                       disabled={!linkUrl.trim() || linkFetchStatus === "loading"}
-                      className="shrink-0 rounded-full border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="shrink-0 rounded-sm border border-accent/40 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {linkFetchStatus === "loading" ? "Fetching…" : "Fetch info"}
                     </button>
@@ -433,7 +433,7 @@ export default function ThroneClaimModal({
                     value={tweetUrl}
                     onChange={(event) => setTweetUrl(event.target.value)}
                     placeholder="https://x.com/user/status/1234567890"
-                    className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent"
+                    className="rounded-sm border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-accent"
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
@@ -442,7 +442,7 @@ export default function ThroneClaimModal({
                     type="text"
                     value={brandTitle}
                     onChange={(event) => setBrandTitle(event.target.value)}
-                    className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
+                    className="rounded-sm border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
@@ -451,7 +451,7 @@ export default function ThroneClaimModal({
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                     rows={2}
-                    className="resize-none rounded-xl border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
+                    className="resize-none rounded-md border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
@@ -460,7 +460,7 @@ export default function ThroneClaimModal({
                     type="text"
                     value={logoUrl}
                     onChange={(event) => setLogoUrl(event.target.value)}
-                    className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
+                    className="rounded-sm border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
                   />
                 </label>
 
@@ -468,14 +468,14 @@ export default function ThroneClaimModal({
                   type="button"
                   onClick={handlePreview}
                   disabled={!tweetUrl || previewStatus === "loading"}
-                  className="self-start rounded-full border border-accent/40 px-4 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="self-start rounded-sm border border-accent/40 px-4 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {previewStatus === "loading" ? "Checking…" : "Preview"}
                 </button>
 
                 {previewStatus === "error" && <p className="text-xs text-danger">{previewError}</p>}
                 {previewIsCurrent && preview && (
-                  <div className="flex items-center gap-3 rounded-xl border border-border bg-black/20 p-3">
+                  <div className="flex items-center gap-3 rounded-md border border-border bg-black/20 p-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={preview.authorAvatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-full" />
                     <div className="min-w-0">
@@ -502,7 +502,7 @@ export default function ThroneClaimModal({
                             onClick={() => setSelectedImageIndex(index)}
                             aria-label={`Use photo ${index + 1}`}
                             aria-pressed={selectedImageIndex === index}
-                            className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 ${
+                            className={`h-14 w-14 shrink-0 overflow-hidden rounded-sm border-2 ${
                               selectedImageIndex === index ? "border-accent" : "border-transparent opacity-60 hover:opacity-100"
                             }`}
                           >
@@ -535,7 +535,7 @@ export default function ThroneClaimModal({
                         key={index}
                         type="button"
                         onClick={() => setOfferedAmount(amount.toFixed(2))}
-                        className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:bg-surface-hover"
+                        className="rounded-sm border border-border px-3 py-1 text-xs text-muted hover:bg-surface-hover"
                       >
                         {index === 0 ? "Minimum" : `+${index === 1 ? "2" : "5"}`} · {formatMoney(amount)}
                       </button>
@@ -548,7 +548,7 @@ export default function ThroneClaimModal({
                     step="0.01"
                     value={offeredAmount}
                     onChange={(event) => setOfferedAmount(event.target.value)}
-                    className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
+                    className="rounded-sm border border-border bg-background px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
                   />
                   <p className="text-xs text-muted-2">
                     Paying more raises the price others must pay to take your throne — the next bidder would need at
@@ -558,7 +558,7 @@ export default function ThroneClaimModal({
               )}
 
               {/* Rules */}
-              <div className="flex flex-col gap-1 rounded-xl border border-border bg-black/15 p-3 text-xs text-muted">
+              <div className="flex flex-col gap-1 rounded-md border border-border bg-black/15 p-3 text-xs text-muted">
                 {PAYMENTS_ENABLED ? (
                   <>
                     <p>• The throne lasts 1 week, starting from when it&apos;s first claimed.</p>
@@ -614,7 +614,7 @@ export default function ThroneClaimModal({
               <button
                 type="submit"
                 disabled={!canSubmit || !acceptedRules || submitting}
-                className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+                className="rounded-sm bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
               >
                 {submitting ? "Claiming…" : PAYMENTS_ENABLED ? `Claim for ${formatMoney(offered)}` : "Claim for free"}
               </button>

@@ -13,11 +13,14 @@ interface ClaimThroneButtonProps {
   className?: string;
 }
 
-// The one "claim/take over a throne" button — a big gold crown CTA, same
-// look everywhere it appears (ThronePanel's own claim row, and now the
-// Leaderboard grid's cards directly) rather than each place styling its own
-// smaller version. Direct request: make claiming impossible to miss, not
-// a quiet link buried under the vote button.
+// The one "claim/take over a throne" button — same squared-off, flat-
+// bordered look everywhere it appears (ThronePanel's own claim row, and now
+// the Leaderboard grid's cards directly) rather than each place styling its
+// own smaller version. Direct request: make claiming impossible to miss —
+// but deliberately not a soft glowing pill; sharp corners, a hard double
+// border, no drop shadow. Reads as a stamped plate/insignia rather than a
+// friendly "buy now" button, matching the sharper, less candy-colored
+// theme direction (see globals.css's --accent).
 export default function ClaimThroneButton({ throne, onOpenClaim, className }: ClaimThroneButtonProps) {
   const vacant = isVacant(throne);
 
@@ -28,7 +31,7 @@ export default function ClaimThroneButton({ throne, onOpenClaim, className }: Cl
   if (!vacant && !PAYMENTS_ENABLED) {
     return (
       <span
-        className={`inline-flex items-center justify-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs text-muted-2 ${className ?? ""}`}
+        className={`inline-flex items-center justify-center gap-1.5 border border-dashed border-border px-4 py-2 text-xs uppercase tracking-wide text-muted-2 ${className ?? ""}`}
         title="No takeovers during the free beta"
       >
         Held up to {BETA_HOLD_HOURS}h
@@ -46,7 +49,7 @@ export default function ClaimThroneButton({ throne, onOpenClaim, className }: Cl
     <button
       type="button"
       onClick={onOpenClaim}
-      className={`flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-bold uppercase tracking-wide text-accent-foreground shadow-md transition-all hover:brightness-110 hover:shadow-lg active:scale-[0.98] ${className ?? ""}`}
+      className={`flex items-center justify-center gap-2 border-2 border-accent-foreground/25 bg-accent px-5 py-3 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-colors hover:border-accent-foreground/50 hover:bg-accent/90 active:bg-accent/80 ${className ?? ""}`}
     >
       <span aria-hidden="true" className="text-lg leading-none">
         👑

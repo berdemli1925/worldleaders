@@ -485,7 +485,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
             map dominates everything below it), and a near-black sea so
             land colors (see vote-color-scale.ts) read clearly against it
             instead of blending into a merely-dim background. */}
-        <div className="relative h-[62vh] min-w-0 flex-1 overflow-hidden rounded-lg bg-[#040508] sm:h-[75vh] lg:h-[88vh]">
+        <div className="relative h-[62vh] min-w-0 flex-1 overflow-hidden rounded-sm bg-[#040508] sm:h-[75vh] lg:h-[88vh]">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${width} ${height}`}
@@ -676,7 +676,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
               is "more votes." */}
           <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md border border-border/60 bg-surface/90 px-2 py-1 text-[10px] text-muted-2 backdrop-blur-sm">
             <span>Fewer votes</span>
-            <span className="h-1.5 w-12 rounded-full" style={{ background: voteColorScaleCss() }} />
+            <span className="h-1.5 w-12 rounded-sm" style={{ background: voteColorScaleCss() }} />
             <span>Leader</span>
           </div>
           {hoveredCountry &&
@@ -733,7 +733,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                   type="button"
                   onClick={handleVoteClick}
                   disabled={isSubmitting || votedForSelected}
-                  className="rounded-full bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+                  className="rounded-sm bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
                 >
                   {voteButtonLabel}
                 </button>

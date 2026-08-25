@@ -61,7 +61,7 @@ export default function CountryVoteButton({ isoCode, countryName, rank }: Countr
         type="button"
         onClick={() => castVote(isoCode)}
         disabled={submitting || voted}
-        className="rounded-full bg-accent px-5 py-3 text-base font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+        className="rounded-sm bg-accent px-5 py-3 text-base font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
       >
         {submitting ? "Voting…" : voted ? "You voted here" : `Vote for ${countryName}`}
       </button>
@@ -74,7 +74,7 @@ export default function CountryVoteButton({ isoCode, countryName, rank }: Countr
       <button
         type="button"
         onClick={handleShareOnX}
-        className="rounded-full border border-border px-5 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+        className="rounded-sm border border-border px-5 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
       >
         {bonusGranted ? "Shared — +5 votes!" : "Share on X"}
       </button>

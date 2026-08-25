@@ -54,7 +54,7 @@ export default function ReportButton({ throneClaimId, compact }: ReportButtonPro
         className={
           compact
             ? "text-muted-2 hover:text-danger"
-            : "rounded-full border border-border px-2 py-1 text-[11px] text-muted-2 hover:border-danger/40 hover:text-danger"
+            : "rounded-sm border border-border px-2 py-1 text-[11px] text-muted-2 hover:border-danger/40 hover:text-danger"
         }
       >
         {compact ? "⚑" : "Report"}
@@ -63,7 +63,7 @@ export default function ReportButton({ throneClaimId, compact }: ReportButtonPro
       {open && (
         <form
           onSubmit={handleSubmit}
-          className="absolute right-0 top-full z-10 mt-1 flex w-64 flex-col gap-2 rounded-xl border border-border bg-surface p-3 shadow-lg"
+          className="absolute right-0 top-full z-10 mt-1 flex w-64 flex-col gap-2 rounded-md border border-border bg-surface p-3 shadow-lg"
         >
           <select
             value={reason}
@@ -90,7 +90,7 @@ export default function ReportButton({ throneClaimId, compact }: ReportButtonPro
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-full bg-danger px-3 py-1 text-xs font-medium text-white hover:brightness-110 disabled:opacity-60"
+              className="rounded-sm bg-danger px-3 py-1 text-xs font-medium text-white hover:brightness-110 disabled:opacity-60"
             >
               {submitting ? "Sending…" : "Submit"}
             </button>

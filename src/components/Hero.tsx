@@ -145,7 +145,7 @@ export default function Hero({
   const leaderMinBid = requiredMinimum(leaderThrone);
 
   return (
-    <section className="flex w-full flex-col gap-5 rounded-2xl border border-border bg-surface p-5 sm:p-6">
+    <section className="flex w-full flex-col gap-5 rounded-md border border-border bg-surface p-5 sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <h1 className="shrink-0 text-2xl font-black uppercase leading-[1.05] tracking-tight text-foreground sm:text-3xl">
@@ -157,7 +157,7 @@ export default function Hero({
             <button
               type="button"
               onClick={() => onSelectCountry(leader.isoCode)}
-              className="flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/10 p-3 text-left transition-colors hover:bg-accent/15 sm:min-w-[220px]"
+              className="flex items-center gap-3 rounded-md border border-accent/30 bg-accent/10 p-3 text-left transition-colors hover:bg-accent/15 sm:min-w-[220px]"
             >
               <Flag alpha2={leader.isoCode} width={36} />
               <div className="min-w-0 flex-1">
@@ -169,14 +169,14 @@ export default function Hero({
               </p>
             </button>
           ) : (
-            <div className="h-[60px] w-full animate-pulse rounded-xl bg-surface-hover sm:w-[220px]" aria-hidden="true" />
+            <div className="h-[60px] w-full animate-pulse rounded-md bg-surface-hover sm:w-[220px]" aria-hidden="true" />
           )}
 
           {runnerUp && gap !== null && (
             <button
               type="button"
               onClick={() => onSelectCountry(runnerUp.isoCode)}
-              className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-surface-hover"
+              className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-surface-hover"
             >
               <Flag alpha2={runnerUp.isoCode} width={22} />
               <span className="min-w-0 truncate text-muted">#2 {runnerUp.name}</span>
@@ -211,7 +211,7 @@ export default function Hero({
                 type="button"
                 onClick={handleVote}
                 disabled={submitting || votedHere}
-                className="rounded-full bg-accent px-5 py-3.5 text-base font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+                className="rounded-sm bg-accent px-5 py-3.5 text-base font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
               >
                 {submitting ? "Voting…" : votedHere ? "You voted here" : `Vote for ${guessMeta.name}`}
               </button>
@@ -220,7 +220,7 @@ export default function Hero({
             <button
               type="button"
               onClick={() => setPicking(true)}
-              className="rounded-full bg-accent px-5 py-3.5 text-base font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:brightness-110"
+              className="rounded-sm bg-accent px-5 py-3.5 text-base font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:brightness-110"
             >
               Vote for your country
             </button>
@@ -283,7 +283,7 @@ export default function Hero({
           onClick={() => setPicking(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-border bg-surface p-4 shadow-xl"
+            className="w-full max-w-sm rounded-md border border-border bg-surface p-4 shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
             <p className="mb-2 text-sm font-medium text-foreground">Pick your country</p>
@@ -293,7 +293,7 @@ export default function Hero({
               onChange={(event) => {
                 if (event.target.value) pickCountry(event.target.value);
               }}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
+              className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
             >
               <option value="" disabled>
                 Select a country…
@@ -307,7 +307,7 @@ export default function Hero({
             <button
               type="button"
               onClick={() => setPicking(false)}
-              className="mt-3 w-full rounded-full border border-border py-2 text-sm text-muted hover:bg-surface-hover"
+              className="mt-3 w-full rounded-sm border border-border py-2 text-sm text-muted hover:bg-surface-hover"
             >
               Cancel
             </button>
