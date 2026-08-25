@@ -258,6 +258,7 @@ export default function Hero({
           )}
           <ThronePanel
             isoCode={leader.isoCode}
+            countryName={leader.name}
             throne={leaderThrone}
             claimHistory={claimHistory}
             now={now}
