@@ -4,8 +4,8 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 
 import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { CTA_CLASSES } from "@/lib/cta-style";
-import { computeImageRect, DEFAULT_IMAGE_CROP } from "@/lib/image-crop";
-import { twitterImageVariant } from "@/lib/twitter-image";
+import { flagUrl } from "@/lib/flag";
+import { optimizedImageUrl } from "@/lib/image-proxy";
 import { voteColorScaleCss, voteCountToColor } from "@/lib/vote-color-scale";
 import type { HypeEntry } from "@/lib/hype";
 import type { ThroneClaimHistoryEntry, ThroneEntry } from "@/lib/throne";
@@ -104,15 +104,40 @@ const FOCUS_TRANSITION_MS = 450;
 // Below this much cumulative pointer movement (in CSS pixels), a press+release
 // is treated as a click/tap on a country rather than a pan gesture.
 const CLICK_THRESHOLD = 6;
-// A leadered country's on-screen bounding box must be at least this many
-// (viewBox-unit, roughly-pixel) wide *and* tall for its post image to
-// replace the small avatar marker — small islands etc. never cross this
-// even fully zoomed in, so they always keep the avatar.
-const IMAGE_MIN_SCREEN_PX = 32;
-// Avatar marker radius, compensated by view.scale below so it stays a
-// constant on-screen size regardless of zoom (same idea as the existing
-// vectorEffect="non-scaling-stroke" on country borders).
-const AVATAR_RADIUS_PX = 9;
+// Leader marker radius, in on-screen pixels — grows with zoom (direct
+// request: "işaretin boyutu zoom seviyesine göre makul ölçüde ayarlansın,
+// küçük ülkelerde bile görünür kalsın ama haritayı boğmasın") instead of
+// staying a fixed dot regardless of zoom level. Small at the fully-zoomed-
+// out world view so ~100 markers at once don't drown the map, growing
+// toward MARKER_MAX_PX as a country fills more of the screen so it's still
+// a clear, detailed circle even on a tiny zoomed-in territory — then
+// plateaus rather than growing without bound. See markerScreenRadius below.
+const MARKER_MIN_PX = 7;
+const MARKER_MAX_PX = 24;
+// Reference zoom level (roughly "a normal-sized country filling most of
+// the screen," see focusCountry) at which the marker reaches MARKER_MAX_PX
+// — picked empirically, not derived from anything. sqrt rather than linear
+// so most of the growth happens early (low/medium zoom), where it's most
+// useful, rather than being spread thin across the huge 1..250 scale range
+// that mostly exists to serve micro-states (see MAX_SCALE above).
+const MARKER_REFERENCE_SCALE = 28;
+
+function markerScreenRadius(scale: number): number {
+  const t = Math.min(1, Math.sqrt(scale / MARKER_REFERENCE_SCALE));
+  return MARKER_MIN_PX + (MARKER_MAX_PX - MARKER_MIN_PX) * t;
+}
+
+// Fixed source width requested from the image optimizer (src/lib/image-proxy.ts)
+// for every marker regardless of its current on-screen size — comfortably
+// crisp even at MARKER_MAX_PX on a retina display, and fixed so zooming
+// in/out doesn't re-request a different size from the optimizer on every
+// frame.
+const MARKER_IMAGE_FETCH_PX = 64;
+// Unrelated to the leader markers above — radius of the #1-by-votes pulse
+// circle further down (AŞAMA 6), which stays a fixed on-screen size
+// regardless of zoom, same as the leader markers used to before zoom-based
+// sizing was added.
+const LEADER_PULSE_RADIUS_PX = 9;
 
 function dist(a: Point, b: Point) {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -174,6 +199,10 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hover, setHover] = useState<HoverState | null>(null);
   const [claimModalOpen, setClaimModalOpen] = useState(false);
+  // ISO codes whose proxied avatar/logo image (see leaderMarkers below)
+  // failed to load — falls back to the flag+crown marker for that country
+  // from then on, per "görsel yüklenemezse taç ikonuna düş."
+  const [failedAvatarIsos, setFailedAvatarIsos] = useState<Set<string>>(new Set());
   // True only while a programmatic focusCountry jump is animating — see
   // FOCUS_TRANSITION_MS. Cleared the instant a real gesture starts so a
   // drag/pinch/wheel right after a jump never fights a CSS transition.
@@ -190,18 +219,35 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
   const leaderCountry = leaderIso ? countryByAlpha2.get(leaderIso) : undefined;
   const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
 
-  // Which leadered countries get the full clipped post image vs. the small
-  // avatar marker, at the current pan/zoom — and which get neither because
-  // they're currently panned off-screen. An <image>/<circle clip> node is
-  // only ever created for a country that lands in one of the two lists
-  // below, so this doubles as the lazy-load mechanism: the browser never
-  // fetches a leader's image/avatar until it actually needs to be shown.
+  // One small round marker per leadered country, at the current pan/zoom —
+  // never a full post image filling the country shape (direct request:
+  // "harita yeniden temiz görünsün ve ülkeler oy oranına göre renklensin",
+  // the marker is the only leadership signal now). Skips countries panned
+  // off-screen, which doubles as the lazy-load mechanism: no <image> node
+  // is created, so the browser never fetches an avatar/logo/flag until it
+  // actually needs to be shown.
+  //
+  // avatarUrl priority mirrors the claim form's own fields (direct
+  // request): the leader's linked post's author photo first, then their
+  // linked website's logo, then null — which renders as a plain flag+crown
+  // marker (see the JSX below) rather than attempting a fetch. Neither
+  // photo is scraped/stored by us; both are exactly what the leader
+  // entered at claim time (see ThroneClaimModal) and are fetched live from
+  // their source, proxied through src/lib/image-proxy.ts. Note this can't
+  // actually verify postAuthorAvatarUrl belongs to the same account as
+  // leaderXUrl/etc. — the linked post can be any public post (see
+  // src/lib/social-links.ts) — treated as good enough: it's still a real
+  // photo of a real account the leader chose to show, and there's no
+  // avatar-fetching capability at all for Instagram/TikTok/Facebook-only
+  // leaders today, only X (via the required linked post).
+  //
   // Kill-switch awareness needs no extra check here — thrones_with_leader
   // already nulls every leader field site-wide when hidden, so throneByIso
-  // simply has nothing to show for any country in that case.
-  const leaderLayers = useMemo(() => {
-    const images: { country: CountryPath; imageUrl: string; throne: ThroneEntry }[] = [];
-    const avatars: { country: CountryPath; avatarUrl: string }[] = [];
+  // simply has nothing to show for any country in that case (direct
+  // request: "acil durum düğmesi aktifken haritadaki profil fotoğrafları
+  // da gizlensin" — inherited for free from that existing mechanism).
+  const leaderMarkers = useMemo(() => {
+    const markers: { country: CountryPath; throne: ThroneEntry; avatarUrl: string | null }[] = [];
 
     for (const country of countries) {
       const throne = country.alpha2 ? throneByIso.get(country.alpha2) : undefined;
@@ -215,18 +261,16 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
       const onScreen = screenX1 >= 0 && screenX0 <= width && screenY1 >= 0 && screenY0 <= height;
       if (!onScreen) continue;
 
-      if (throne.postImageUrl && screenX1 - screenX0 >= IMAGE_MIN_SCREEN_PX && screenY1 - screenY0 >= IMAGE_MIN_SCREEN_PX) {
-        // "orig" — up from a fixed small variant — now that MAX_SCALE lets a
-        // claimed country fill most of the screen, anything less looks
-        // visibly soft at that size. See src/lib/twitter-image.ts.
-        images.push({ country, imageUrl: twitterImageVariant(throne.postImageUrl, "orig"), throne });
-      } else if (throne.postAuthorAvatarUrl) {
-        avatars.push({ country, avatarUrl: throne.postAuthorAvatarUrl });
-      }
+      const rawAvatarUrl = throne.postAuthorAvatarUrl || throne.logoUrl || null;
+      const avatarUrl =
+        rawAvatarUrl && country.alpha2 && !failedAvatarIsos.has(country.alpha2)
+          ? optimizedImageUrl(rawAvatarUrl, MARKER_IMAGE_FETCH_PX)
+          : null;
+      markers.push({ country, throne, avatarUrl });
     }
 
-    return { images, avatars };
-  }, [countries, throneByIso, view, width, height]);
+    return markers;
+  }, [countries, throneByIso, view, width, height, failedAvatarIsos]);
 
   const zoomAt = useCallback(
     (clientX: number, clientY: number, factor: number) => {
@@ -532,107 +576,76 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                 );
               })}
 
-              {/* Leader content layer — painted on top of the base fill/
+              {/* Leader marker layer — painted on top of the base fill/
                   stroke paths above, but pointer-events:none throughout so
                   every existing click/hover/keyboard interaction still
-                  targets the base <path> underneath, completely unchanged. */}
-              {(leaderLayers.images.length > 0 || leaderLayers.avatars.length > 0) && (
+                  targets the base <path> underneath, completely unchanged.
+                  The map itself stays a plain vote-ratio choropleth (direct
+                  request) — this is the only leadership signal on it; the
+                  leader's full content (post, brand, description, link,
+                  amount paid, time left, report button) only shows in the
+                  side panel opened by clicking the country — see
+                  ThronePanel, used unchanged below. */}
+              {leaderMarkers.length > 0 && (
                 <>
                   <defs>
-                    {leaderLayers.images.map(({ country }) => (
-                      <clipPath key={`clip-img-${country.id}`} id={`clip-img-${country.id}`}>
-                        <path d={country.d} />
-                      </clipPath>
-                    ))}
-                    {leaderLayers.avatars.map(({ country }) => (
-                      <clipPath key={`clip-avatar-${country.id}`} id={`clip-avatar-${country.id}`}>
-                        <circle cx={country.centroid[0]} cy={country.centroid[1]} r={AVATAR_RADIUS_PX / view.scale} />
+                    {leaderMarkers.map(({ country }) => (
+                      <clipPath key={`clip-marker-${country.id}`} id={`clip-marker-${country.id}`}>
+                        <circle cx={country.centroid[0]} cy={country.centroid[1]} r={markerScreenRadius(view.scale) / view.scale} />
                       </clipPath>
                     ))}
                   </defs>
 
-                  {leaderLayers.images.map(({ country, imageUrl, throne }) => {
-                    const [x0, y0, x1, y1] = country.bounds;
-                    const boxWidth = x1 - x0;
-                    const boxHeight = y1 - y0;
-                    // The claimer's chosen crop (ImagePositioner) when we
-                    // know the image's natural size — same computeImageRect
-                    // call the positioner itself used, so this is pixel-
-                    // identical to what they previewed. Falls back to plain
-                    // preserveAspectRatio cover-fit for claims made before
-                    // image cropping existed (no stored width/height).
-                    const rect =
-                      throne.postImageWidth && throne.postImageHeight
-                        ? computeImageRect(
-                            { width: boxWidth, height: boxHeight },
-                            { width: throne.postImageWidth, height: throne.postImageHeight },
-                            throne.postImageScale !== null && throne.postImageOffsetX !== null && throne.postImageOffsetY !== null
-                              ? { scale: throne.postImageScale, offsetX: throne.postImageOffsetX, offsetY: throne.postImageOffsetY }
-                              : DEFAULT_IMAGE_CROP,
-                          )
-                        : null;
-                    return (
-                      <g key={country.id} pointerEvents="none" clipPath={`url(#clip-img-${country.id})`}>
-                        <image
-                          href={imageUrl}
-                          x={rect ? x0 + rect.x : x0}
-                          y={rect ? y0 + rect.y : y0}
-                          width={rect ? rect.width : boxWidth}
-                          height={rect ? rect.height : boxHeight}
-                          preserveAspectRatio={rect ? "none" : "xMidYMid slice"}
-                        />
-                        {/* Just enough darkening that the (redrawn, on-top)
-                            border and hover tooltip name stay readable —
-                            AŞAMA 1.5 asks for leader images to read clearly,
-                            not be dimmed like before. */}
-                        <rect x={x0} y={y0} width={boxWidth} height={boxHeight} fill="black" fillOpacity={0.12} />
-                      </g>
-                    );
-                  })}
-                  {/* Redraw each image country's border on top, crisp, unobscured by the photo. */}
-                  {leaderLayers.images.map(({ country }) => (
-                    <path
-                      key={`border-${country.id}`}
-                      d={country.d}
-                      fill="none"
-                      className="stroke-accent"
-                      strokeWidth={1.5}
-                      vectorEffect="non-scaling-stroke"
-                      pointerEvents="none"
-                    />
-                  ))}
-
-                  {/* Avatar-only leadered countries (too small on screen for
-                      the full post image) still get their border
-                      emphasized, same as image countries above — AŞAMA 1.5:
-                      "Lideri olan ülkelerin sınırları vurgu rengiyle
-                      belirginleşsin," not just the large ones. */}
-                  {leaderLayers.avatars.map(({ country }) => (
-                    <path
-                      key={`border-avatar-${country.id}`}
-                      d={country.d}
-                      fill="none"
-                      className="stroke-accent"
-                      strokeWidth={1}
-                      vectorEffect="non-scaling-stroke"
-                      pointerEvents="none"
-                    />
-                  ))}
-
-                  {leaderLayers.avatars.map(({ country, avatarUrl }) => {
-                    const r = AVATAR_RADIUS_PX / view.scale;
+                  {leaderMarkers.map(({ country, avatarUrl }) => {
+                    const r = markerScreenRadius(view.scale) / view.scale;
                     const [cx, cy] = country.centroid;
+                    const clipId = `clip-marker-${country.id}`;
                     return (
                       <g key={country.id} pointerEvents="none">
-                        <image
-                          href={avatarUrl}
-                          x={cx - r}
-                          y={cy - r}
-                          width={r * 2}
-                          height={r * 2}
-                          clipPath={`url(#clip-avatar-${country.id})`}
-                          preserveAspectRatio="xMidYMid slice"
-                        />
+                        {avatarUrl ? (
+                          <image
+                            href={avatarUrl}
+                            x={cx - r}
+                            y={cy - r}
+                            width={r * 2}
+                            height={r * 2}
+                            clipPath={`url(#${clipId})`}
+                            preserveAspectRatio="xMidYMid slice"
+                            onError={() => {
+                              const iso = country.alpha2;
+                              if (!iso) return;
+                              setFailedAvatarIsos((prev) => (prev.has(iso) ? prev : new Set(prev).add(iso)));
+                            }}
+                          />
+                        ) : (
+                          // Neither a linked social post nor a website logo
+                          // — direct request: fall back to a plain crown
+                          // over the country's flag rather than attempting
+                          // any further fetch.
+                          <>
+                            <image
+                              href={flagUrl(country.alpha2 ?? "", 80)}
+                              x={cx - r}
+                              y={cy - r}
+                              width={r * 2}
+                              height={r * 2}
+                              clipPath={`url(#${clipId})`}
+                              preserveAspectRatio="xMidYMid slice"
+                            />
+                            <text
+                              x={cx}
+                              y={cy}
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fontSize={r * 1.3}
+                              style={{ paintOrder: "stroke" }}
+                              stroke="black"
+                              strokeWidth={r * 0.12}
+                            >
+                              👑
+                            </text>
+                          </>
+                        )}
                         <circle
                           cx={cx}
                           cy={cy}
@@ -652,7 +665,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                 <circle
                   cx={leaderCountry.centroid[0]}
                   cy={leaderCountry.centroid[1]}
-                  r={AVATAR_RADIUS_PX / view.scale}
+                  r={LEADER_PULSE_RADIUS_PX / view.scale}
                   className="fill-accent/40 animate-leader-pulse"
                   style={{ transformBox: "fill-box", transformOrigin: "center" }}
                   pointerEvents="none"
