@@ -47,6 +47,13 @@ export default function ThronePanel({ isoCode, countryName, throne, claimHistory
   const hasLeader = !isVacant(throne);
   const pastClaims = claimHistory.filter((claim) => claim.isoCode === isoCode && claim.id !== throne?.currentClaimId);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  // The tall post photo (see h-80 below) is the single biggest thing in
+  // this card — direct request: let it collapse instead of always eating
+  // that much vertical space. Defaults open (unchanged behavior); once
+  // someone collapses it, it stays collapsed only for this render of the
+  // panel (no persistence — reopening the map panel/switching countries
+  // resets it, same as historyExpanded above).
+  const [photoExpanded, setPhotoExpanded] = useState(true);
   const visiblePastClaims = historyExpanded ? pastClaims : pastClaims.slice(0, 1);
 
   return (
@@ -67,15 +74,26 @@ export default function ThronePanel({ isoCode, countryName, throne, claimHistory
       {hasLeader && throne ? (
         <>
           {throne.postImageUrl && (
-            <CroppedLeaderImage
-              imageUrl={throne.postImageUrl}
-              imageWidth={throne.postImageWidth}
-              imageHeight={throne.postImageHeight}
-              scale={throne.postImageScale}
-              offsetX={throne.postImageOffsetX}
-              offsetY={throne.postImageOffsetY}
-              className="h-80 w-full rounded-sm"
-            />
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPhotoExpanded((expanded) => !expanded)}
+                className="self-start text-[11px] uppercase tracking-wide text-accent hover:underline"
+              >
+                {photoExpanded ? "Hide photo ▲" : "Show photo ▼"}
+              </button>
+              {photoExpanded && (
+                <CroppedLeaderImage
+                  imageUrl={throne.postImageUrl}
+                  imageWidth={throne.postImageWidth}
+                  imageHeight={throne.postImageHeight}
+                  scale={throne.postImageScale}
+                  offsetX={throne.postImageOffsetX}
+                  offsetY={throne.postImageOffsetY}
+                  className="h-80 w-full rounded-sm"
+                />
+              )}
+            </div>
           )}
 
           {/* Brand row — square logo (not a circular avatar; deliberately

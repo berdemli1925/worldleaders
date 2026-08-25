@@ -476,7 +476,7 @@ export default function Leaderboard({
                   <img
                     src={previewImage || (leaderAvatar as string)}
                     alt=""
-                    className="h-7 w-7 rounded-md border border-accent object-cover"
+                    className="h-14 w-14 rounded-md border border-accent object-cover"
                   />
                 )}
                 {hasLeader ? (
