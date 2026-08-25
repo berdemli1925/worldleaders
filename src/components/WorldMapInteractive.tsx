@@ -6,6 +6,7 @@ import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { CTA_CLASSES } from "@/lib/cta-style";
 import { flagUrl } from "@/lib/flag";
 import { optimizedImageUrl } from "@/lib/image-proxy";
+import { leaderAvatarSourceUrl } from "@/lib/social-links";
 import { voteColorScaleCss, voteCountToColor } from "@/lib/vote-color-scale";
 import type { HypeEntry } from "@/lib/hype";
 import type { ThroneClaimHistoryEntry, ThroneEntry } from "@/lib/throne";
@@ -227,19 +228,18 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
   // is created, so the browser never fetches an avatar/logo/flag until it
   // actually needs to be shown.
   //
-  // avatarUrl priority mirrors the claim form's own fields (direct
-  // request): the leader's linked post's author photo first, then their
-  // linked website's logo, then null — which renders as a plain flag+crown
-  // marker (see the JSX below) rather than attempting a fetch. Neither
-  // photo is scraped/stored by us; both are exactly what the leader
-  // entered at claim time (see ThroneClaimModal) and are fetched live from
-  // their source, proxied through src/lib/image-proxy.ts. Note this can't
-  // actually verify postAuthorAvatarUrl belongs to the same account as
-  // leaderXUrl/etc. — the linked post can be any public post (see
-  // src/lib/social-links.ts) — treated as good enough: it's still a real
-  // photo of a real account the leader chose to show, and there's no
-  // avatar-fetching capability at all for Instagram/TikTok/Facebook-only
-  // leaders today, only X (via the required linked post).
+  // avatarUrl priority: the photo of whichever platform the leader
+  // actually declared as their identity (leaderAvatarSourceUrl — same
+  // priority order used everywhere else a claim's identity matters, see
+  // src/lib/social-links.ts), then their linked website's logo, then null
+  // — which renders as a plain flag+crown marker (see the JSX below)
+  // rather than attempting a fetch. None of these photos are scraped/
+  // stored by us; they're fetched live from their source, proxied through
+  // src/lib/image-proxy.ts. Real capability varies by platform — X (via
+  // the required linked post) and Facebook (a no-auth Graph API field)
+  // both resolve to a real photo; Instagram and TikTok have no free,
+  // stable, unauthenticated photo source today and always fall through —
+  // see leaderAvatarSourceUrl's own comment for why.
   //
   // Kill-switch awareness needs no extra check here — thrones_with_leader
   // already nulls every leader field site-wide when hidden, so throneByIso
@@ -261,7 +261,16 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
       const onScreen = screenX1 >= 0 && screenX0 <= width && screenY1 >= 0 && screenY0 <= height;
       if (!onScreen) continue;
 
-      const rawAvatarUrl = throne.postAuthorAvatarUrl || throne.logoUrl || null;
+      const rawAvatarUrl =
+        leaderAvatarSourceUrl({
+          x: throne.leaderXUrl,
+          instagram: throne.leaderInstagramUrl,
+          tiktok: throne.leaderTiktokUrl,
+          facebook: throne.leaderFacebookUrl,
+          postAuthorAvatarUrl: throne.postAuthorAvatarUrl,
+        }) ||
+        throne.logoUrl ||
+        null;
       const avatarUrl =
         rawAvatarUrl && country.alpha2 && !failedAvatarIsos.has(country.alpha2)
           ? optimizedImageUrl(rawAvatarUrl, MARKER_IMAGE_FETCH_PX)
