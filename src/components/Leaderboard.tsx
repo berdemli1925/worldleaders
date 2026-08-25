@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
 import { getCountryMeta } from "@/lib/country-meta";
 import { getSlugForCountry } from "@/lib/country-slug";
 import { getFingerprint } from "@/lib/fingerprint";
@@ -16,7 +17,7 @@ import {
   openShareWindow,
   xIntentUrl,
 } from "@/lib/share";
-import { isVacant, type ThroneEntry } from "@/lib/throne";
+import { isVacant, requiredMinimum, type ThroneEntry } from "@/lib/throne";
 import { twitterImageVariant } from "@/lib/twitter-image";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import Flag from "./Flag";
@@ -56,12 +57,18 @@ type LeaderFilter = "all" | "has" | "none";
 //    had before), so a small country picking up steam outranks a top
 //    country's much larger but proportionally smaller gain
 //  - active: most raw votes in the last 24 hours
-type SortMode = "votes" | "climbers" | "rising" | "active";
+//  - cheapest: lowest price to take over right now (ascending, unlike the
+//    others) — only meaningful once real money is on the line, so it's
+//    left out of the tab list entirely during the free beta (every
+//    occupied country's "price" is a flat $2 there — see claim_throne_beta
+//    in scripts/setup-leader-identity.mjs — which would just be noise).
+type SortMode = "votes" | "climbers" | "rising" | "active" | "cheapest";
 const SORT_MODES: [SortMode, string][] = [
   ["votes", "Ranking"],
   ["climbers", "Biggest climbers"],
   ["rising", "Rising"],
   ["active", "Most active today"],
+  ...(PAYMENTS_ENABLED ? ([["cheapest", "Cheapest to claim"]] as [SortMode, string][]) : []),
 ];
 
 type Period = "month" | "allTime";
@@ -186,6 +193,14 @@ export default function Leaderboard({
     if (sortMode === "votes") {
       return [...list].sort(
         (a, b) => b.entry.voteCount - a.entry.voteCount || a.entry.name.localeCompare(b.entry.name),
+      );
+    }
+    if (sortMode === "cheapest") {
+      // Ascending — cheapest first, the one sort mode that isn't "biggest
+      // number wins" — and, unlike climbers/rising/active, driven directly
+      // by throne data rather than the momentum snapshot.
+      return [...list].sort(
+        (a, b) => requiredMinimum(a.throne) - requiredMinimum(b.throne) || a.entry.name.localeCompare(b.entry.name),
       );
     }
     return [...list].sort(
@@ -337,8 +352,8 @@ export default function Leaderboard({
             role="tab"
             aria-selected={sortMode === value}
             onClick={() => setSortMode(value)}
-            disabled={value !== "votes" && !momentum}
-            title={value !== "votes" && !momentum ? "Loading…" : undefined}
+            disabled={value !== "votes" && value !== "cheapest" && !momentum}
+            title={value !== "votes" && value !== "cheapest" && !momentum ? "Loading…" : undefined}
             className={
               sortMode === value
                 ? "rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground"
