@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
+import { CTA_CLASSES } from "@/lib/cta-style";
 import type { RankedCountry } from "@/lib/rank";
 import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
@@ -211,7 +212,7 @@ export default function Hero({
                 type="button"
                 onClick={handleVote}
                 disabled={submitting || votedHere}
-                className="rounded-sm bg-accent px-5 py-3.5 text-base font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+                className={`px-5 py-3.5 text-base font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-hover disabled:text-muted ${CTA_CLASSES}`}
               >
                 {submitting ? "Voting…" : votedHere ? "You voted here" : `Vote for ${guessMeta.name}`}
               </button>
@@ -220,7 +221,7 @@ export default function Hero({
             <button
               type="button"
               onClick={() => setPicking(true)}
-              className="rounded-sm bg-accent px-5 py-3.5 text-base font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:brightness-110"
+              className={`px-5 py-3.5 text-base font-bold uppercase tracking-wide ${CTA_CLASSES}`}
             >
               Vote for your country
             </button>

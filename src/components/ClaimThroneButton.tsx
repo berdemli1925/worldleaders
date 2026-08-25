@@ -1,6 +1,7 @@
 "use client";
 
 import { BETA_HOLD_HOURS, PAYMENTS_ENABLED } from "@/lib/beta-mode";
+import { CTA_CLASSES } from "@/lib/cta-style";
 import { isVacant, requiredMinimum, type ThroneEntry } from "@/lib/throne";
 
 function formatMoney(amount: number): string {
@@ -13,14 +14,14 @@ interface ClaimThroneButtonProps {
   className?: string;
 }
 
-// The one "claim/take over a throne" button — same squared-off, flat-
-// bordered look everywhere it appears (ThronePanel's own claim row, and now
-// the Leaderboard grid's cards directly) rather than each place styling its
-// own smaller version. Direct request: make claiming impossible to miss —
-// but deliberately not a soft glowing pill; sharp corners, a hard double
-// border, no drop shadow. Reads as a stamped plate/insignia rather than a
-// friendly "buy now" button, matching the sharper, less candy-colored
-// theme direction (see globals.css's --accent).
+// The one "claim/take over a throne" button — same look everywhere it
+// appears (ThronePanel's own claim row, and now the Leaderboard grid's
+// cards directly) rather than each place styling its own smaller version.
+// Direct request, second pass: a near-black stenciled plate with a bold
+// yellow label and a thin war-red frame ("siyah üstüne sarı yazı, kenarda
+// kırmızı") — reads as a warning/hazard marker, not a friendly "buy now"
+// pill. See src/lib/cta-style.ts, shared by every primary action button
+// site-wide now, not just this one.
 export default function ClaimThroneButton({ throne, onOpenClaim, className }: ClaimThroneButtonProps) {
   const vacant = isVacant(throne);
 
@@ -49,12 +50,18 @@ export default function ClaimThroneButton({ throne, onOpenClaim, className }: Cl
     <button
       type="button"
       onClick={onOpenClaim}
-      className={`flex items-center justify-center gap-2 border-2 border-accent-foreground/25 bg-accent px-5 py-3 text-sm font-bold uppercase tracking-widest text-accent-foreground transition-colors hover:border-accent-foreground/50 hover:bg-accent/90 active:bg-accent/80 ${className ?? ""}`}
+      className={`flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold uppercase tracking-widest ${CTA_CLASSES} ${className ?? ""}`}
     >
+      <span aria-hidden="true" className="text-cta-border">
+        ▸
+      </span>
       <span aria-hidden="true" className="text-lg leading-none">
         👑
       </span>
       {label}
+      <span aria-hidden="true" className="text-cta-border">
+        ◂
+      </span>
     </button>
   );
 }

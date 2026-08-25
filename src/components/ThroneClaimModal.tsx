@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { track } from "@/lib/analytics";
 import { BETA_HOLD_HOURS, BETA_MAX_COUNTRIES_PER_USER, PAYMENTS_ENABLED } from "@/lib/beta-mode";
+import { CTA_CLASSES } from "@/lib/cta-style";
 import { getFingerprint } from "@/lib/fingerprint";
 import { DEFAULT_IMAGE_CROP, type ImageCropTransform, type Size } from "@/lib/image-crop";
 import { parseSocialUrl, SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/social-links";
@@ -614,7 +615,7 @@ export default function ThroneClaimModal({
               <button
                 type="submit"
                 disabled={!canSubmit || !acceptedRules || submitting}
-                className="rounded-sm bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+                className={`px-4 py-2 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-hover disabled:text-muted ${CTA_CLASSES}`}
               >
                 {submitting ? "Claiming…" : PAYMENTS_ENABLED ? `Claim for ${formatMoney(offered)}` : "Claim for free"}
               </button>

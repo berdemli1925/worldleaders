@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 
+import { CTA_CLASSES } from "@/lib/cta-style";
 import { getFingerprint } from "@/lib/fingerprint";
 import {
   buildShareText,
@@ -61,7 +62,7 @@ export default function CountryVoteButton({ isoCode, countryName, rank }: Countr
         type="button"
         onClick={() => castVote(isoCode)}
         disabled={submitting || voted}
-        className="rounded-sm bg-accent px-5 py-3 text-base font-bold uppercase tracking-wide text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+        className={`px-5 py-3 text-base font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-hover disabled:text-muted ${CTA_CLASSES}`}
       >
         {submitting ? "Voting…" : voted ? "You voted here" : `Vote for ${countryName}`}
       </button>

@@ -8,13 +8,20 @@
   --foreground: #f4f4f5;
   --muted: #9c9ca4;
   --muted-2: #6c6c74;
-  /* Direct request: less vivid, more serious/sharp — a dulled bronze/rust
-     rather than the bright canary gold this used to be. Still reads as
-     "gold/power" for the crown-and-throne theme, just worn/battle-worn
-     instead of shiny-new. Keep --danger a true red so it stays visually
-     distinct from this — a war-red accent would collide with error state. */
-  --accent: #9c5a1f;
-  --accent-foreground: #f4ece0;
+  /* Direct request, second pass — still too soft. --accent is now a
+     muted hazard-stripe yellow: darker/duller than the original gold, used
+     mostly as text/border highlights (leader handles, focus rings, the map
+     choropleth's top end), rarely as a big solid fill anymore. Primary
+     action buttons (Vote/Claim/submit — see --cta-*) moved off --accent
+     entirely onto their own near-black plate + yellow label + a thin
+     war-red frame, per "siyah üstüne sarı veya kırmızı yazı." Keep
+     --danger a true, slightly different red so error states stay visually
+     distinct from --cta-border. */
+  --accent: #b3892c;
+  --accent-foreground: #0a0a0a;
+  --cta-bg: #050506;
+  --cta-text: #d8ab35;
+  --cta-border: #9c332b;
   --danger: #f2555a;
   --success: #34d399;
   --radius-card: 1rem;
@@ -30,6 +37,9 @@
   --color-muted-2: var(--muted-2);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-cta-bg: var(--cta-bg);
+  --color-cta-text: var(--cta-text);
+  --color-cta-border: var(--cta-border);
   --color-danger: var(--danger);
   --color-success: var(--success);
   --font-sans: var(--font-display);

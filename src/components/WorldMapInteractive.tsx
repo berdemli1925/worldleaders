@@ -3,6 +3,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { buildCountryByAlpha2 } from "@/lib/country-path";
+import { CTA_CLASSES } from "@/lib/cta-style";
 import { computeImageRect, DEFAULT_IMAGE_CROP } from "@/lib/image-crop";
 import { twitterImageVariant } from "@/lib/twitter-image";
 import { voteColorScaleCss, voteCountToColor } from "@/lib/vote-color-scale";
@@ -733,7 +734,7 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                   type="button"
                   onClick={handleVoteClick}
                   disabled={isSubmitting || votedForSelected}
-                  className="rounded-sm bg-accent px-3 py-2 text-sm font-medium text-accent-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-surface-hover disabled:text-muted"
+                  className={`px-3 py-2 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-hover disabled:text-muted ${CTA_CLASSES}`}
                 >
                   {voteButtonLabel}
                 </button>
