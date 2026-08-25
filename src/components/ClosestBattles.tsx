@@ -93,12 +93,12 @@ export default function ClosestBattles({ entries, thrones, submittingIso, onVote
                         >
                           👑
                         </span>
-                        {leaderAvatar && (
+                        {(previewImage || leaderAvatar) && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={leaderAvatar}
+                            src={previewImage || (leaderAvatar as string)}
                             alt=""
-                            className="h-4 w-4 rounded-full border border-accent object-cover"
+                            className="h-9 w-9 rounded-md border border-accent object-cover"
                           />
                         )}
                         {hasLeader ? (
