@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
+import { mapHypeRow, type HypeEntry, type HypeRow } from "@/lib/hype";
 import type { SerializedMomentum } from "@/lib/momentum";
 import { toRankedEntries, type CountryRow } from "@/lib/rank";
 import { SHARE_VOTE_BONUS } from "@/lib/share-bonus";
@@ -13,6 +14,7 @@ import { currentMonthStartMs } from "@/lib/time";
 import { useVote } from "@/lib/use-vote";
 import ClosestBattles from "./ClosestBattles";
 import Hero from "./Hero";
+import HypeBanner from "./HypeBanner";
 import LiveFeed from "./LiveFeed";
 import Leaderboard from "./Leaderboard";
 import LeaderTicker, { type TickerItem } from "./LeaderTicker";
@@ -33,6 +35,7 @@ interface DashboardProps {
 
 const VOTES_CHANNEL = "votes-updates";
 const THRONES_CHANNEL = "thrones-updates";
+const HYPE_CHANNEL = "hype-updates";
 const HIGHLIGHT_DURATION_MS = 2200;
 
 // Bug fix: this used to compute next UTC *midnight* (the daily vote-limit
@@ -191,6 +194,40 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     fetchThrones();
     thronesChannelRef.current?.send({ type: "broadcast", event: "throne-claimed", payload: {} });
   }, [fetchThrones]);
+
+  // hype_slot_public — see src/lib/hype.ts / scripts/setup-hype.mjs. A
+  // single row (or none, if nobody's hyping right now) rather than one per
+  // country, since there's only one global spotlight. Same
+  // fetch-on-mount + realtime-broadcast-on-change shape as thrones above;
+  // silently stays null if the migration hasn't been run yet.
+  const [hype, setHype] = useState<HypeEntry | null>(null);
+  const hypeChannelRef = useRef<RealtimeChannel | null>(null);
+
+  const fetchHype = useCallback(async () => {
+    const { data, error } = await supabaseBrowser.from("hype_slot_public").select("*").maybeSingle();
+    if (error) return;
+    setHype(data ? mapHypeRow(data as HypeRow) : null);
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchHype();
+  }, [fetchHype]);
+
+  useEffect(() => {
+    const channel = supabaseBrowser.channel(HYPE_CHANNEL);
+    channel.on("broadcast", { event: "hype-changed" }, () => fetchHype()).subscribe();
+    hypeChannelRef.current = channel;
+    return () => {
+      supabaseBrowser.removeChannel(channel);
+      hypeChannelRef.current = null;
+    };
+  }, [fetchHype]);
+
+  const handleHyped = useCallback(() => {
+    fetchHype();
+    hypeChannelRef.current?.send({ type: "broadcast", event: "hype-changed", payload: {} });
+  }, [fetchHype]);
 
   // share_bonuses_public — see src/lib/share-bonus.ts. Fetched once on
   // mount (bonuses only ever change one country/one person at a time, and
@@ -452,7 +489,13 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
         now={now}
         onThroneClaimed={handleThroneClaimed}
         onGuessedCountry={handleGuessedCountry}
+        hype={hype}
+        onHyped={handleHyped}
       />
+      {/* Direct request: a "hype" spotlight above the map — a throne
+          holder can pay to put their country here for a few hours
+          regardless of vote rank, not just the #1 country by votes. */}
+      <HypeBanner hype={hype} now={now} onSelectCountry={handleTickerSelect} />
       <TopBar totalVotes={totalVotes} resetTarget={resetTarget} now={now} />
       <div className="w-full rounded-md border border-border bg-surface p-4">
         <WorldMapInteractive
@@ -472,6 +515,8 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
           claimHistory={claimHistory}
           now={now}
           onThroneClaimed={handleThroneClaimed}
+          hype={hype}
+          onHyped={handleHyped}
         />
       </div>
       <ClosestBattles

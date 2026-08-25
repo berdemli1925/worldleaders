@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import AdminDashboard, {
   type ActiveLeader,
   type BlockedHandle,
+  type CurrentHype,
   type ModerationReport,
   type PaymentRow,
 } from "./AdminDashboard";
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 // views — those views mask everything when the kill switch is on, which is
 // exactly the state an admin needs to see through, not be subject to.
 async function loadAdminData() {
-  const [{ data: thrones }, { data: reports }, { data: blocked }, { data: settings }, { data: payments }] =
+  const [{ data: thrones }, { data: reports }, { data: blocked }, { data: settings }, { data: payments }, { data: hypeSlot }] =
     await Promise.all([
       supabaseAdmin
         .from("thrones")
@@ -46,6 +47,11 @@ async function loadAdminData() {
         )
         .order("created_at", { ascending: false })
         .limit(50),
+      // Raw table, not hype_slot_public — same "see through expiry/kill
+      // switch" reasoning as thrones above; an admin should be able to see
+      // (and clear) a hype that's technically expired but hasn't been
+      // superseded by a new one yet.
+      supabaseAdmin.from("hype_slot").select("country_iso_code, current_value, cycle_end").eq("id", 1).maybeSingle(),
     ]);
 
   const claimIds = (thrones ?? []).map((t) => t.current_claim_id as number);
@@ -112,7 +118,16 @@ async function loadAdminData() {
     createdAt: p.created_at as string,
   }));
 
-  return { activeLeaders, moderationReports, blockedHandles, leadershipHidden, paymentRows };
+  const currentHype: CurrentHype | null =
+    hypeSlot?.country_iso_code && hypeSlot?.cycle_end
+      ? {
+          country: hypeSlot.country_iso_code as string,
+          currentValue: (hypeSlot.current_value as number | null) ?? 0,
+          cycleEnd: hypeSlot.cycle_end as string,
+        }
+      : null;
+
+  return { activeLeaders, moderationReports, blockedHandles, leadershipHidden, paymentRows, currentHype };
 }
 
 export default async function AdminPage() {

@@ -7,6 +7,7 @@ import { CTA_CLASSES } from "@/lib/cta-style";
 import { computeImageRect, DEFAULT_IMAGE_CROP } from "@/lib/image-crop";
 import { twitterImageVariant } from "@/lib/twitter-image";
 import { voteColorScaleCss, voteCountToColor } from "@/lib/vote-color-scale";
+import type { HypeEntry } from "@/lib/hype";
 import type { ThroneClaimHistoryEntry, ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
 import ThroneClaimModal from "./ThroneClaimModal";
@@ -47,6 +48,9 @@ interface WorldMapInteractiveProps {
   /** Shared "now" clock, for the reign countdown — same one the top bar/leaderboard use. */
   now: number | null;
   onThroneClaimed: () => void;
+  /** Current global hype state and its refetch — threaded through to ThronePanel's Hype button. See src/lib/hype.ts. */
+  hype: HypeEntry | null;
+  onHyped: () => void;
 }
 
 interface Point {
@@ -157,6 +161,8 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
     claimHistory,
     now,
     onThroneClaimed,
+    hype,
+    onHyped,
   },
   ref,
 ) {
@@ -748,6 +754,8 @@ const WorldMapInteractive = forwardRef<WorldMapHandle, WorldMapInteractiveProps>
                     claimHistory={claimHistory}
                     now={now}
                     onOpenClaim={() => setClaimModalOpen(true)}
+                    hype={hype}
+                    onHyped={onHyped}
                   />
                 </div>
               </div>

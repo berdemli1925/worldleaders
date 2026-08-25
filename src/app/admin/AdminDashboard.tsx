@@ -47,8 +47,15 @@ export interface PaymentRow {
   createdAt: string;
 }
 
+export interface CurrentHype {
+  country: string;
+  currentValue: number;
+  cycleEnd: string;
+}
+
 interface AdminDashboardProps {
   activeLeaders: ActiveLeader[];
+  currentHype: CurrentHype | null;
   moderationReports: ModerationReport[];
   blockedHandles: BlockedHandle[];
   leadershipHidden: boolean;
@@ -156,6 +163,7 @@ function EditClaimForm({
 
 export default function AdminDashboard({
   activeLeaders,
+  currentHype,
   moderationReports,
   blockedHandles,
   leadershipHidden,
@@ -250,6 +258,31 @@ export default function AdminDashboard({
             className={`px-3 py-1.5 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-60 ${CTA_CLASSES}`}
           >
             Set price
+          </button>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold text-foreground">🔥 Hype spotlight</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-4">
+          {currentHype ? (
+            <p className="text-sm text-foreground">
+              <span className="font-medium">{currentHype.country}</span>
+              <span className="ml-2 font-mono text-xs text-muted">{formatMoney(currentHype.currentValue)}</span>
+              <span className="ml-2 text-xs text-muted-2">
+                ends {new Date(currentHype.cycleEnd).toLocaleString("en-US")}
+              </span>
+            </p>
+          ) : (
+            <p className="text-sm text-muted">Nobody&apos;s hyping right now.</p>
+          )}
+          <button
+            type="button"
+            disabled={!currentHype || busy === "reset-hype"}
+            onClick={() => run("reset-hype", "/api/admin/hype/reset")}
+            className="rounded-sm border border-border px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Reset hype
           </button>
         </div>
       </section>

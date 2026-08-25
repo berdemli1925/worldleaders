@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildCountryByAlpha2 } from "@/lib/country-path";
 import { getCountryMeta } from "@/lib/country-meta";
 import { CTA_CLASSES } from "@/lib/cta-style";
+import type { HypeEntry } from "@/lib/hype";
 import type { RankedCountry } from "@/lib/rank";
 import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import type { MyVoteStatus } from "@/lib/use-vote";
@@ -34,6 +35,9 @@ interface HeroProps {
   onThroneClaimed: () => void;
   /** Fires once the visitor's own country is known (IP guess, browser-language fallback, or a manual "Not you?" pick) — Dashboard uses this to auto-zoom the map there, direct request: land straight on "here's where you are" instead of the whole-world default view. */
   onGuessedCountry?: (isoCode: string) => void;
+  /** Current global hype state and its refetch — threaded through to ThronePanel's Hype button. See src/lib/hype.ts. */
+  hype: HypeEntry | null;
+  onHyped: () => void;
 }
 
 const OVERRIDE_KEY = "wl-country-override";
@@ -77,6 +81,8 @@ export default function Hero({
   now,
   onThroneClaimed,
   onGuessedCountry,
+  hype,
+  onHyped,
 }: HeroProps) {
   const [override, setOverride] = useState<string | null>(null);
   const [clientGuess, setClientGuess] = useState<string | undefined>(undefined);
@@ -263,6 +269,8 @@ export default function Hero({
             claimHistory={claimHistory}
             now={now}
             onOpenClaim={() => setClaimModalOpen(true)}
+            hype={hype}
+            onHyped={onHyped}
           />
         </div>
       )}

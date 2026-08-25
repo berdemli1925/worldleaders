@@ -3,10 +3,12 @@
 import { useState } from "react";
 
 import { PAYMENTS_ENABLED } from "@/lib/beta-mode";
+import { isHypeActive, type HypeEntry } from "@/lib/hype";
 import { isVacant, requiredMinimum, type ThroneClaimHistoryEntry, type ThroneEntry } from "@/lib/throne";
 import ClaimThroneButton from "./ClaimThroneButton";
 import CountdownTimer from "./CountdownTimer";
 import CroppedLeaderImage from "./CroppedLeaderImage";
+import HypeModal from "./HypeModal";
 import LeaderIdentityBadges from "./LeaderIdentityBadges";
 import ReportButton from "./ReportButton";
 
@@ -18,6 +20,9 @@ interface ThronePanelProps {
   claimHistory: ThroneClaimHistoryEntry[];
   now: number | null;
   onOpenClaim: () => void;
+  /** Current global hype state (see src/lib/hype.ts) — only used here to know whether *this* country already holds the spotlight, for the Hype button's label. */
+  hype: HypeEntry | null;
+  onHyped: () => void;
 }
 
 function formatMoney(amount: number): string {
@@ -43,10 +48,21 @@ function formatPastAmount(amount: number): string {
 // takeover button on one row, and a "previous leaders" section that shows
 // just the most recent one collapsed with a "Show all (N)" toggle rather
 // than a wall of chips.
-export default function ThronePanel({ isoCode, countryName, throne, claimHistory, now, onOpenClaim }: ThronePanelProps) {
+export default function ThronePanel({
+  isoCode,
+  countryName,
+  throne,
+  claimHistory,
+  now,
+  onOpenClaim,
+  hype,
+  onHyped,
+}: ThronePanelProps) {
   const hasLeader = !isVacant(throne);
   const pastClaims = claimHistory.filter((claim) => claim.isoCode === isoCode && claim.id !== throne?.currentClaimId);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [hypeModalOpen, setHypeModalOpen] = useState(false);
+  const isHypedNow = isHypeActive(hype, now) && hype?.isoCode === isoCode;
   // The tall post photo (see h-80 below) is the single biggest thing in
   // this card — direct request: let it collapse instead of always eating
   // that much vertical space. Defaults open (unchanged behavior); once
@@ -154,11 +170,26 @@ export default function ThronePanel({ isoCode, countryName, throne, claimHistory
           </div>
 
           {/* Price + takeover — the memleket-style "$103 · Devral $104" row. */}
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="border border-border px-3 py-1.5 font-mono text-sm text-foreground">
               {formatMoney(throne.currentValue ?? 0)}
             </span>
-            <ClaimThroneButton throne={throne} onOpenClaim={onOpenClaim} className="px-4 py-2 text-xs sm:text-sm" />
+            <div className="flex items-center gap-2">
+              {/* Only the country's own throne panel gets this — hyping
+                  puts *this* claim in the one spotlight above the map for
+                  a few hours, regardless of vote rank. Server-side (beta
+                  mode) checks the browser's fingerprint against this
+                  claim's own, so it can't be used to hype someone else's
+                  country — see /api/hype/claim. */}
+              <button
+                type="button"
+                onClick={() => setHypeModalOpen(true)}
+                className="border border-cta-border px-3 py-2 text-xs font-bold uppercase tracking-wide text-cta-border transition-colors hover:bg-cta-border/10 sm:text-sm"
+              >
+                🔥 {isHypedNow ? "Extend hype" : "Hype"}
+              </button>
+              <ClaimThroneButton throne={throne} onOpenClaim={onOpenClaim} className="px-4 py-2 text-xs sm:text-sm" />
+            </div>
           </div>
         </>
       ) : (
@@ -194,6 +225,17 @@ export default function ThronePanel({ isoCode, countryName, throne, claimHistory
             </button>
           )}
         </div>
+      )}
+
+      {hypeModalOpen && throne && (
+        <HypeModal
+          isoCode={isoCode}
+          countryName={countryName}
+          hype={hype}
+          now={now}
+          onClose={() => setHypeModalOpen(false)}
+          onHyped={onHyped}
+        />
       )}
     </div>
   );
