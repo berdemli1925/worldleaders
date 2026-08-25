@@ -5,7 +5,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import { mapHypeRow, type HypeEntry, type HypeRow } from "@/lib/hype";
 import type { SerializedMomentum } from "@/lib/momentum";
-import { toRankedEntries, type CountryRow } from "@/lib/rank";
+import { findClosestRival, toRankedEntries, type CountryRow } from "@/lib/rank";
 import { SHARE_VOTE_BONUS } from "@/lib/share-bonus";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { mapThroneRow, type ThroneClaimHistoryEntry, type ThroneEntry, type ThroneRow } from "@/lib/throne";
@@ -339,18 +339,12 @@ export default function Dashboard({ countries, width, height, initialHighlightIs
     if (!newEntry) return;
     const newRank = newIndex + 1;
 
-    // Nearest rival: whoever's immediately above in rank (the one worth
-    // catching), or — if this country is already #1 — whoever's immediately
-    // below (the one worth watching).
-    const rivalEntry = newIndex > 0 ? fresh[newIndex - 1] : fresh[newIndex + 1];
-    const rival = rivalEntry
-      ? {
-          isoCode: rivalEntry.isoCode,
-          name: rivalEntry.name,
-          voteCount: rivalEntry.voteCount,
-          direction: (newIndex > 0 ? "ahead" : "behind") as "ahead" | "behind",
-        }
-      : null;
+    // Nearest rival: whichever neighbor — immediately above or below in
+    // rank — is actually closer in votes, not just "always whoever's
+    // above." Same definition the share card/text use (src/lib/rank.ts),
+    // so what's shown here matches what gets shared. Null when no neighbor
+    // is close enough to read as a real contest.
+    const rival = findClosestRival(fresh, pending.isoCode);
 
     setVoteResult({
       isoCode: pending.isoCode,

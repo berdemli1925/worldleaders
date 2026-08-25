@@ -9,6 +9,7 @@ import { getRankedLeaderboard } from "@/lib/country-rank";
 import { getCountryBySlug, getAllCountrySlugs } from "@/lib/country-slug";
 import { getCountryPath } from "@/lib/country-topology";
 import { getMomentumData } from "@/lib/momentum";
+import { findClosestRival } from "@/lib/rank";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // AŞAMA 3 — one statically-generated page per country (/turkiye, /greece,
@@ -40,6 +41,10 @@ async function loadCountryPage(slug: string) {
   const voteCount = row?.voteCount ?? 0;
   const nextAbove = index > 0 ? rows[index - 1] : null;
   const votesToOvertake = nextAbove ? nextAbove.voteCount - voteCount + 1 : null;
+  // Same "closest rival" definition the share card/text and vote-result
+  // screen use — see src/lib/rank.ts. Drives both the share button's
+  // matchup text and the OG description below.
+  const rival = findClosestRival(rows, entry.alpha2);
 
   const rankNow = momentum.rankNow.get(entry.alpha2) ?? rank;
   const rank7dAgo = momentum.rank7dAgo.get(entry.alpha2) ?? rankNow;
@@ -53,6 +58,7 @@ async function loadCountryPage(slug: string) {
     nextAboveName: nextAbove?.name ?? null,
     votesToOvertake,
     weeklyChange,
+    rival,
     throne: throneRow as
       | {
           x_handle: string | null;
@@ -78,7 +84,11 @@ export async function generateMetadata({
   if (!data) return {};
 
   const title = `${data.entry.name} — Ranked #${data.rank} on World Leaders`;
-  const description = `${data.entry.name} has ${data.voteCount.toLocaleString("en-US")} votes this month on World Leaders. Vote for ${data.entry.name}, or claim its throne.`;
+  const description = data.rival
+    ? // rival.direction is from entry's POV: "ahead" means the rival is
+      // ahead of entry, so entry reads as "behind" it, and vice versa.
+      `${data.entry.name} (${data.voteCount.toLocaleString("en-US")}) is only ${data.rival.gap.toLocaleString("en-US")} votes ${data.rival.direction === "ahead" ? "behind" : "ahead of"} ${data.rival.name} (${data.rival.voteCount.toLocaleString("en-US")}) on World Leaders. Pick a side.`
+    : `${data.entry.name} has ${data.voteCount.toLocaleString("en-US")} votes this month on World Leaders. Vote for ${data.entry.name}, or claim its throne.`;
   const imageUrl = `/api/og/country/${data.entry.alpha2}`;
 
   return {
@@ -95,7 +105,7 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
   const data = await loadCountryPage(country);
   if (!data) notFound();
 
-  const { entry, meta, rank, voteCount, nextAboveName, votesToOvertake, weeklyChange, throne, mapPath } = data;
+  const { entry, meta, rank, voteCount, nextAboveName, votesToOvertake, weeklyChange, throne, mapPath, rival } = data;
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center bg-background px-4 py-8 sm:py-12">
@@ -193,7 +203,13 @@ export default async function CountryPage({ params }: { params: Promise<{ countr
           )}
         </div>
 
-        <CountryVoteButton isoCode={entry.alpha2} countryName={entry.name} rank={rank} />
+        <CountryVoteButton
+          isoCode={entry.alpha2}
+          countryName={entry.name}
+          rank={rank}
+          voteCount={voteCount}
+          rival={rival}
+        />
       </main>
     </div>
   );

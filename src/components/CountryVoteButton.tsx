@@ -4,8 +4,9 @@ import { useCallback, useRef, useState } from "react";
 
 import { CTA_CLASSES } from "@/lib/cta-style";
 import { getFingerprint } from "@/lib/fingerprint";
+import type { RivalInfo } from "@/lib/rank";
 import {
-  buildShareText,
+  buildShareTextFor,
   claimShareBonus,
   countryShareUrl,
   detectShareLocale,
@@ -19,6 +20,11 @@ interface CountryVoteButtonProps {
   isoCode: string;
   countryName: string;
   rank: number;
+  voteCount: number;
+  /** Closest rival (src/lib/rank.ts's findClosestRival), computed server-side
+   * by the page that renders this — drives the matchup share format when
+   * there's a real one, single-country format otherwise. */
+  rival: RivalInfo | null;
 }
 
 // A self-contained vote button for the standalone country pages (AŞAMA 3) —
@@ -27,7 +33,7 @@ interface CountryVoteButtonProps {
 // just needs to be able to vote on the spot, not run the full live map.
 // The full post-vote result screen (AŞAMA 2) lives on the home page — this
 // links there instead of reimplementing it.
-export default function CountryVoteButton({ isoCode, countryName, rank }: CountryVoteButtonProps) {
+export default function CountryVoteButton({ isoCode, countryName, rank, voteCount, rival }: CountryVoteButtonProps) {
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const [bonusGranted, setBonusGranted] = useState(false);
@@ -43,11 +49,13 @@ export default function CountryVoteButton({ isoCode, countryName, rank }: Countr
   const submitting = submittingIso === isoCode;
 
   // Opens the share window in the visitor's own language (see
-  // src/lib/share.ts), then claims their one-time +5-vote share bonus in
-  // the background.
+  // src/lib/share.ts) — matchup format against the closest rival when
+  // there's a real one, single-country format otherwise — then claims
+  // their one-time +5-vote share bonus in the background.
   const handleShareOnX = () => {
     const locale = detectShareLocale();
-    openShareWindow(xIntentUrl(buildShareText(countryName, rank, locale), countryShareUrl(isoCode)));
+    const text = buildShareTextFor({ isoCode, name: countryName, voteCount }, rank, rival, locale);
+    openShareWindow(xIntentUrl(text, countryShareUrl(isoCode)));
     void (async () => {
       const fingerprint = await getFingerprint();
       const result = await claimShareBonus(isoCode, fingerprint);

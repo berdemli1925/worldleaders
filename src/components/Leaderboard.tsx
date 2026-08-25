@@ -11,9 +11,9 @@ import { CTA_CLASSES } from "@/lib/cta-style";
 import { getFingerprint } from "@/lib/fingerprint";
 import type { HypeEntry } from "@/lib/hype";
 import type { SerializedMomentum } from "@/lib/momentum";
-import type { RankedCountry } from "@/lib/rank";
+import { findClosestRival, type RankedCountry } from "@/lib/rank";
 import {
-  buildShareText,
+  buildShareTextFor,
   claimShareBonus,
   countryShareUrl,
   detectShareLocale,
@@ -135,25 +135,6 @@ export default function Leaderboard({
   // leaders one after another shouldn't collapse the previous one.
   const [expandedIsos, setExpandedIsos] = useState<Set<string>>(new Set());
 
-  // Opens an X share-intent window pre-filled with a link back to this
-  // country (?country=XX, read by page.tsx's generateMetadata for the
-  // per-country OG card — see /api/og/country), in the sharer's own
-  // language (see src/lib/share.ts), then claims their one-time +5-vote
-  // share bonus in the background — never blocks or delays the share
-  // window itself opening.
-  const handleShareOnX = useCallback(
-    (isoCode: string, countryName: string, rank: number) => {
-      const locale = detectShareLocale();
-      openShareWindow(xIntentUrl(buildShareText(countryName, rank, locale), countryShareUrl(isoCode)));
-      void (async () => {
-        const fingerprint = await getFingerprint();
-        const result = await claimShareBonus(isoCode, fingerprint);
-        if (result.granted) onShareBonusGranted?.();
-      })();
-    },
-    [onShareBonusGranted],
-  );
-
   const [search, setSearch] = useState("");
   const [continent, setContinent] = useState<ContinentFilter>("All");
   const [leaderFilter, setLeaderFilter] = useState<LeaderFilter>("all");
@@ -164,6 +145,29 @@ export default function Leaderboard({
   const throneByIso = useMemo(() => new Map(thrones.map((throne) => [throne.isoCode, throne])), [thrones]);
 
   const activeEntries = period === "month" ? entries : allTimeEntries;
+
+  // Opens an X share-intent window pre-filled with a link back to this
+  // country (?country=XX, read by page.tsx's generateMetadata for the
+  // per-country OG card — see /api/og/country), in the sharer's own
+  // language (see src/lib/share.ts). Matchup format against the closest
+  // rival (src/lib/rank.ts) when there is one, single-country format
+  // otherwise — same rule the OG card and vote-result share use. Then
+  // claims their one-time +5-vote share bonus in the background — never
+  // blocks or delays the share window itself opening.
+  const handleShareOnX = useCallback(
+    (entry: LeaderboardEntry, rank: number) => {
+      const locale = detectShareLocale();
+      const rival = findClosestRival(activeEntries, entry.isoCode);
+      const text = buildShareTextFor(entry, rank, rival, locale);
+      openShareWindow(xIntentUrl(text, countryShareUrl(entry.isoCode)));
+      void (async () => {
+        const fingerprint = await getFingerprint();
+        const result = await claimShareBonus(entry.isoCode, fingerprint);
+        if (result.granted) onShareBonusGranted?.();
+      })();
+    },
+    [activeEntries, onShareBonusGranted],
+  );
 
   const withLeaderInfo = useMemo(
     () =>
@@ -490,7 +494,7 @@ export default function Leaderboard({
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation();
-                      handleShareOnX(entry.isoCode, entry.name, index + 1);
+                      handleShareOnX(entry, index + 1);
                     }}
                     aria-label={`Share ${entry.name} on X`}
                     title="Share on X"

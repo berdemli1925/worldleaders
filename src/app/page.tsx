@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getCountryMeta } from "@/lib/country-meta";
 import { getRankedLeaderboard } from "@/lib/country-rank";
 import { getGeoCountryIso } from "@/lib/geo";
+import { findClosestRival } from "@/lib/rank";
 import { LogoMark } from "@/components/Logo";
 import WorldMap from "@/components/WorldMap";
 
@@ -24,10 +25,16 @@ export async function generateMetadata({ searchParams }: PageProps<"/">): Promis
   const rows = await getRankedLeaderboard();
   const rankIndex = rows.findIndex((row) => row.isoCode === countryParam);
   const voteCount = rankIndex >= 0 ? rows[rankIndex].voteCount : 0;
+  // Same "closest rival" definition the share card/text use — see
+  // src/lib/rank.ts's findClosestRival.
+  const rival = rankIndex >= 0 ? findClosestRival(rows, countryParam) : null;
 
   const title = `${meta.name} — World Leaders`;
-  const description =
-    rankIndex >= 0
+  const description = rival
+    ? // rival.direction is from this country's POV: "ahead" means the rival
+      // is ahead of it, so it reads as "behind" the rival, and vice versa.
+      `${meta.name} (${voteCount.toLocaleString("en-US")}) is only ${rival.gap.toLocaleString("en-US")} votes ${rival.direction === "ahead" ? "behind" : "ahead of"} ${rival.name} (${rival.voteCount.toLocaleString("en-US")}). Pick a side.`
+    : rankIndex >= 0
       ? `${meta.name} is ranked #${rankIndex + 1} this month with ${voteCount.toLocaleString("en-US")} votes. Vote or claim the throne.`
       : `Vote for ${meta.name}, or claim its throne, on World Leaders.`;
   const imageUrl = `/api/og/country/${countryParam}`;
