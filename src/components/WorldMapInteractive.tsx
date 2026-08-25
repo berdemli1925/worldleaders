@@ -113,15 +113,24 @@ const CLICK_THRESHOLD = 6;
 // toward MARKER_MAX_PX as a country fills more of the screen so it's still
 // a clear, detailed circle even on a tiny zoomed-in territory — then
 // plateaus rather than growing without bound. See markerScreenRadius below.
-const MARKER_MIN_PX = 7;
-const MARKER_MAX_PX = 24;
+// Direct correction: the original 7-24px range read as "way too small,
+// especially once zoomed in" — a normal-sized country's own on-screen size
+// grows a lot faster than a marker capped at 24px ever could, so the
+// marker looked like it was shrinking relative to everything around it
+// even though it was never actually shrinking in absolute pixels. Both
+// ends bumped up substantially, and MARKER_REFERENCE_SCALE raised so the
+// marker keeps growing across a wider chunk of the zoom range instead of
+// hitting its cap almost immediately (28 was well within what
+// focusCountry's fitScale already reaches for an ordinary-sized country).
+const MARKER_MIN_PX = 12;
+const MARKER_MAX_PX = 46;
 // Reference zoom level (roughly "a normal-sized country filling most of
 // the screen," see focusCountry) at which the marker reaches MARKER_MAX_PX
 // — picked empirically, not derived from anything. sqrt rather than linear
 // so most of the growth happens early (low/medium zoom), where it's most
 // useful, rather than being spread thin across the huge 1..250 scale range
 // that mostly exists to serve micro-states (see MAX_SCALE above).
-const MARKER_REFERENCE_SCALE = 28;
+const MARKER_REFERENCE_SCALE = 90;
 
 function markerScreenRadius(scale: number): number {
   const t = Math.min(1, Math.sqrt(scale / MARKER_REFERENCE_SCALE));
@@ -133,7 +142,7 @@ function markerScreenRadius(scale: number): number {
 // crisp even at MARKER_MAX_PX on a retina display, and fixed so zooming
 // in/out doesn't re-request a different size from the optimizer on every
 // frame.
-const MARKER_IMAGE_FETCH_PX = 64;
+const MARKER_IMAGE_FETCH_PX = 96;
 // Unrelated to the leader markers above — radius of the #1-by-votes pulse
 // circle further down (AŞAMA 6), which stays a fixed on-screen size
 // regardless of zoom, same as the leader markers used to before zoom-based
