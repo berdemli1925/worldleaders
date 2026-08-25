@@ -1,17 +1,18 @@
-// Sequential fill color for the map's vote choropleth: vivid blue at zero
-// votes up to a hot vivid red for the current leader — a "cold to hot"
-// heat-map read, deliberately vivid (direct request, reversing an earlier
-// pass that muted this along with the rest of the theme: the map's colors
-// are functional/legibility-driven, not decorative, so they stay vivid
-// even though buttons/chrome moved to the flatter black/yellow/red CTA
-// look — see cta-style.ts). Plain RGB lerp rather than a d3-scale
+// Sequential fill color for the map's vote choropleth: bright yellow at
+// zero votes fading to a deep, matte red for the current leader — direct
+// request, correcting an earlier pass that went vivid blue -> vivid red
+// instead of the actually-asked-for "sarıdan kırmızıya, parlaktan mata"
+// (yellow to red, bright to matte). Plain RGB lerp rather than a d3-scale
 // dependency — it's one straight line between two colors.
 //
-// Bright enough to read clearly against the near-black map background
-// (see WorldMapInteractive's map container) so land stays obviously land,
-// not a shade away from the sea. See gelistirme-plani-v2.md AŞAMA 1.5.
-const LIGHT: [number, number, number] = [59, 130, 246]; // vivid blue
-const DARK: [number, number, number] = [225, 29, 45]; // vivid red — "hot," matches the war theme
+// LIGHT stays bright enough to read clearly against the near-black map
+// background (see WorldMapInteractive's map container) so land stays
+// obviously land, not a shade away from the sea; DARK is deliberately
+// desaturated/darkened rather than a second vivid color, so the scale
+// itself reads as "calming down" toward the top instead of two competing
+// neon ends. See gelistirme-plani-v2.md AŞAMA 1.5.
+const LIGHT: [number, number, number] = [250, 204, 21]; // bright yellow
+const DARK: [number, number, number] = [127, 29, 29]; // matte, dark red
 
 // A flat linear gradient between the same two endpoints voteCountToColor
 // interpolates between — for the map's color-key legend, not the map
