@@ -533,9 +533,10 @@ export default function Leaderboard({
                       event.stopPropagation();
                       setHypeIso(entry.isoCode);
                     }}
-                    className="shrink-0 border border-cta-border px-2 py-1 text-xs font-bold uppercase tracking-wide text-cta-border transition-colors hover:bg-cta-border/10"
+                    className="flex h-10 shrink-0 items-center justify-center gap-1.5 border-2 border-cta-border px-3 text-sm font-bold uppercase tracking-wide text-cta-border transition-colors hover:bg-cta-border/10"
                   >
-                    🔥
+                    <span aria-hidden="true">🔥</span>
+                    Hype
                   </button>
                 )}
               </div>
