@@ -5,7 +5,7 @@ import { BETA_MAX_COUNTRIES_PER_USER, PAYMENTS_ENABLED } from "@/lib/beta-mode";
 import { getClientIp } from "@/lib/get-client-ip";
 import { MAX_IMAGE_CROP_SCALE } from "@/lib/image-crop";
 import { getPaymentProvider } from "@/lib/payments";
-import { normalizeSocialUrl } from "@/lib/social-links";
+import { computeLeaderIdentityKey, normalizeSocialUrl } from "@/lib/social-links";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchTweetSnapshot } from "@/lib/x-post";
 
@@ -96,6 +96,13 @@ export async function POST(request: NextRequest) {
     }
     leaderUrls[platform as keyof typeof rawLeaderUrls] = normalized;
   }
+  // See scripts/setup-persistent-leader-credit.mjs — the same stable key
+  // every past/future claim under this leader's identity collapses to, so
+  // claim_throne() can sum credit across it regardless of cycle or which
+  // post got shown. Null only when somehow none of the four validated
+  // URLs above parse (shouldn't happen — they were just validated), which
+  // just means this claim earns/draws no credit.
+  const leaderIdentityKey = computeLeaderIdentityKey(leaderUrls);
 
   // Always re-fetch server-side — never trust a snapshot the client claims
   // to have already fetched, or the amount it displayed. This is the one
@@ -183,6 +190,7 @@ export async function POST(request: NextRequest) {
       p_leader_instagram_url: leaderUrls.instagram,
       p_leader_tiktok_url: leaderUrls.tiktok,
       p_leader_facebook_url: leaderUrls.facebook,
+      p_leader_identity_key: leaderIdentityKey,
     });
     if (claimError || !claimId) {
       return NextResponse.json({ error: claimError?.message ?? "Claim failed." }, { status: 400 });
@@ -228,6 +236,7 @@ export async function POST(request: NextRequest) {
       leader_instagram_url: leaderUrls.instagram,
       leader_tiktok_url: leaderUrls.tiktok,
       leader_facebook_url: leaderUrls.facebook,
+      leader_identity_key: leaderIdentityKey,
     })
     .select("id")
     .single();

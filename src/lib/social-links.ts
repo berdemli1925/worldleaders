@@ -113,3 +113,36 @@ export function normalizeSocialUrl(platform: SocialPlatform, url: string): strin
 export function platformLabel(platform: SocialPlatform): string {
   return PLATFORM_DEFS[platform].label;
 }
+
+// Fixed priority order a leader's four possible identity fields collapse
+// into a single stable key — same person, same key, every claim, as long
+// as they keep re-linking at least one of the same profiles. Used for
+// throne credit (see scripts/setup-persistent-leader-credit.mjs): a
+// claim's credit toward a country is every net dollar previously spent
+// under this same key, indefinitely, not tied to a cycle or to whichever
+// post happened to be displayed. X is checked first simply because it's
+// the platform the rest of this feature (posts, handles) is built around;
+// the order itself doesn't need to mean anything beyond "always the same".
+const LEADER_IDENTITY_PRIORITY: SocialPlatform[] = ["x", "instagram", "tiktok", "facebook"];
+
+/**
+ * Collapses a claim's (already-validated) leader identity URLs into one
+ * key, or null if none parse — e.g. only X and Instagram are filled in,
+ * X wins: `"x:someuser"`. Two claims naturally share a key exactly when
+ * they share a real platform handle, regardless of which of the four
+ * fields carried it or what casing was typed.
+ */
+export function computeLeaderIdentityKey(urls: {
+  x: string | null;
+  instagram: string | null;
+  tiktok: string | null;
+  facebook: string | null;
+}): string | null {
+  for (const platform of LEADER_IDENTITY_PRIORITY) {
+    const url = urls[platform];
+    if (!url) continue;
+    const handle = parseSocialUrl(platform, url);
+    if (handle) return `${platform}:${handle.toLowerCase()}`;
+  }
+  return null;
+}
